@@ -140,6 +140,97 @@ try { db.exec(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT
 try { db.exec(`ALTER TABLE contacts ADD COLUMN notes TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN body_params TEXT`); } catch {}
 
+// ---------- تعدد الأرقام (قسم مستقل لكل رقم واتساب) ----------
+try {
+  db.exec(`
+CREATE TABLE IF NOT EXISTS phone_numbers (
+  phone_number_id TEXT PRIMARY KEY,
+  label TEXT,
+  display_number TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+)`);
+} catch {}
+
+const ENV_PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID && !String(process.env.PHONE_NUMBER_ID).startsWith('SET_ME') ? String(process.env.PHONE_NUMBER_ID) : null;
+if (ENV_PHONE_NUMBER_ID) {
+  try {
+    db.prepare(`INSERT INTO phone_numbers (phone_number_id, label, display_number, is_default, created_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT(phone_number_id) DO NOTHING`)
+      .run(ENV_PHONE_NUMBER_ID, 'أكاديمية غرفة جازان', null, Date.now());
+  } catch {}
+}
+try {
+  if (!db.prepare(`SELECT count(*) AS n FROM phone_numbers WHERE is_default = 1`).get().n) {
+    db.exec(`UPDATE phone_numbers SET is_default = 1 WHERE phone_number_id = (SELECT phone_number_id FROM phone_numbers ORDER BY created_at ASC LIMIT 1)`);
+  }
+} catch {}
+
+export function defaultPhoneNumberId() {
+  return db.prepare(`SELECT phone_number_id FROM phone_numbers WHERE is_default = 1 ORDER BY created_at ASC LIMIT 1`).get()?.phone_number_id ?? ENV_PHONE_NUMBER_ID ?? null;
+}
+
+// ترقية جدول المحادثات لمفتاح مركّب: نفس العميل تكون له محادثة مستقلة مع كل رقم
+try {
+  const convoCols = db.prepare(`PRAGMA table_info(conversations)`).all().map((c) => c.name);
+  if (!convoCols.includes('phone_number_id')) {
+    const defId = defaultPhoneNumberId() ?? '';
+    db.exec(`BEGIN`);
+    db.exec(`
+CREATE TABLE conversations_new (
+  wa_id TEXT NOT NULL,
+  phone_number_id TEXT NOT NULL DEFAULT '',
+  name TEXT,
+  last_message TEXT,
+  last_message_at INTEGER,
+  unread INTEGER NOT NULL DEFAULT 0,
+  bot_enabled INTEGER NOT NULL DEFAULT 1,
+  assigned_to INTEGER,
+  pending_menu INTEGER,
+  last_after_hours_at INTEGER,
+  status TEXT NOT NULL DEFAULT 'open',
+  PRIMARY KEY (wa_id, phone_number_id)
+)`);
+    db.prepare(`
+INSERT INTO conversations_new (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status)
+SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status FROM conversations`).run(defId);
+    db.exec(`DROP TABLE conversations`);
+    db.exec(`ALTER TABLE conversations_new RENAME TO conversations`);
+    db.exec(`COMMIT`);
+    console.log('تمت ترقية جدول المحادثات لدعم تعدد الأرقام');
+  }
+} catch (e) {
+  try { db.exec(`ROLLBACK`); } catch {}
+  console.error('فشلت ترقية جدول المحادثات:', e.message);
+}
+try { db.exec(`ALTER TABLE messages ADD COLUMN phone_number_id TEXT`); } catch {}
+try {
+  const defId = defaultPhoneNumberId();
+  if (defId) db.prepare(`UPDATE messages SET phone_number_id = ? WHERE phone_number_id IS NULL`).run(defId);
+} catch {}
+
+export function listPhoneNumbers() {
+  return db.prepare(`SELECT * FROM phone_numbers ORDER BY is_default DESC, created_at ASC`).all();
+}
+
+// تسجيل تلقائي لأي رقم تصله رسالة أول مرة (من بيانات الـ Webhook)
+export function registerPhoneNumber(phoneNumberId, displayNumber = null) {
+  if (!phoneNumberId) return;
+  const id = String(phoneNumberId);
+  const autoLabel = displayNumber ? `رقم ${displayNumber}` : `قسم ${id.slice(-4)}`;
+  db.prepare(`INSERT INTO phone_numbers (phone_number_id, label, display_number, is_default, created_at)
+    VALUES (?, ?, ?, 0, ?)
+    ON CONFLICT(phone_number_id) DO UPDATE SET display_number = COALESCE(excluded.display_number, phone_numbers.display_number)`)
+    .run(id, autoLabel, displayNumber ?? null, Date.now());
+}
+
+export function setPhoneNumberLabel(phoneNumberId, label) {
+  db.prepare(`UPDATE phone_numbers SET label = ? WHERE phone_number_id = ?`).run(label, String(phoneNumberId));
+}
+
+export function deletePhoneNumber(phoneNumberId) {
+  db.prepare(`DELETE FROM phone_numbers WHERE phone_number_id = ? AND is_default = 0`).run(String(phoneNumberId));
+}
+
 const now = () => Date.now();
 
 // لقطة متسقة من قاعدة البيانات للنسخ الاحتياطي
@@ -147,38 +238,40 @@ export function snapshotTo(outPath) {
   db.exec(`VACUUM INTO '${outPath}'`);
 }
 
-export function upsertInbound({ waId, name, waMessageId, type, body, ts, mediaId = null, mimeType = null, filename = null }) {
+export function upsertInbound({ waId, phoneNumberId = null, name, waMessageId, type, body, ts, mediaId = null, mimeType = null, filename = null }) {
   const t = ts ?? now();
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, media_id, mime_type, filename, created_at)
-     VALUES (?, ?, 'inbound', ?, ?, 'received', ?, ?, ?, ?)`
-  ).run(waMessageId ?? null, waId, type, body ?? null, mediaId, mimeType, filename, t);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, media_id, mime_type, filename, created_at, phone_number_id)
+     VALUES (?, ?, 'inbound', ?, ?, 'received', ?, ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body ?? null, mediaId, mimeType, filename, t, pn);
 
   db.prepare(
-    `INSERT INTO conversations (wa_id, name, last_message, last_message_at, unread)
-     VALUES (?, ?, ?, ?, 1)
-     ON CONFLICT(wa_id) DO UPDATE SET
+    `INSERT INTO conversations (wa_id, phone_number_id, name, last_message, last_message_at, unread)
+     VALUES (?, ?, ?, ?, ?, 1)
+     ON CONFLICT(wa_id, phone_number_id) DO UPDATE SET
        name = COALESCE(excluded.name, conversations.name),
        last_message = excluded.last_message,
        last_message_at = excluded.last_message_at,
        unread = conversations.unread + 1`
-  ).run(waId, name ?? null, body ?? `[${type}]`, t);
+  ).run(waId, pn, name ?? null, body ?? `[${type}]`, t);
 }
 
-export function insertOutbound({ waId, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null, sender = null }) {
+export function insertOutbound({ waId, phoneNumberId = null, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null, sender = null }) {
   const t = now();
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, sender, created_at)
-     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?, ?)`
-  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, sender, t);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, sender, created_at, phone_number_id)
+     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, sender, t, pn);
 
   db.prepare(
-    `INSERT INTO conversations (wa_id, last_message, last_message_at, unread)
-     VALUES (?, ?, ?, 0)
-     ON CONFLICT(wa_id) DO UPDATE SET
+    `INSERT INTO conversations (wa_id, phone_number_id, last_message, last_message_at, unread)
+     VALUES (?, ?, ?, ?, 0)
+     ON CONFLICT(wa_id, phone_number_id) DO UPDATE SET
        last_message = excluded.last_message,
        last_message_at = excluded.last_message_at`
-  ).run(waId, body, t);
+  ).run(waId, pn, body, t);
 }
 
 export function updateStatus(waMessageId, status) {
@@ -193,8 +286,9 @@ export function listConversations(agent = null) {
   if (agent && agent.role !== 'admin') {
     return db
       .prepare(
-        `SELECT c.*, a.name AS assigned_name FROM conversations c
+        `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
          LEFT JOIN agents a ON a.id = c.assigned_to
+         LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id
          WHERE c.assigned_to IS NULL OR c.assigned_to = ?
          ORDER BY c.last_message_at DESC`
       )
@@ -202,15 +296,17 @@ export function listConversations(agent = null) {
   }
   return db
     .prepare(
-      `SELECT c.*, a.name AS assigned_name FROM conversations c
+      `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
        LEFT JOIN agents a ON a.id = c.assigned_to
+       LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id
        ORDER BY c.last_message_at DESC`
     )
     .all();
 }
 
-export function assignConversation(waId, agentId) {
-  db.prepare(`UPDATE conversations SET assigned_to = ? WHERE wa_id = ?`).run(agentId, waId);
+export function assignConversation(waId, agentId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET assigned_to = ? WHERE wa_id = ? AND phone_number_id = ?`).run(agentId, waId, pn);
 }
 
 // ---------- الموظفون ----------
@@ -246,9 +342,10 @@ export function getMessage(id) {
   return db.prepare(`SELECT * FROM messages WHERE id = ?`).get(id);
 }
 
-export function listMessages(waId) {
-  db.prepare(`UPDATE conversations SET unread = 0 WHERE wa_id = ?`).run(waId);
-  return db.prepare(`SELECT * FROM messages WHERE wa_id = ? ORDER BY created_at ASC`).all(waId);
+export function listMessages(waId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET unread = 0 WHERE wa_id = ? AND phone_number_id = ?`).run(waId, pn);
+  return db.prepare(`SELECT * FROM messages WHERE wa_id = ? AND phone_number_id = ? ORDER BY created_at ASC`).all(waId, pn);
 }
 
 // ---------- البوت ----------
@@ -282,12 +379,14 @@ export function getBotRule(id) {
   return r;
 }
 
-export function getPendingMenu(waId) {
-  return db.prepare(`SELECT pending_menu FROM conversations WHERE wa_id = ?`).get(waId)?.pending_menu ?? null;
+export function getPendingMenu(waId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  return db.prepare(`SELECT pending_menu FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, pn)?.pending_menu ?? null;
 }
 
-export function setPendingMenu(waId, ruleId) {
-  db.prepare(`UPDATE conversations SET pending_menu = ? WHERE wa_id = ?`).run(ruleId, waId);
+export function setPendingMenu(waId, ruleId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET pending_menu = ? WHERE wa_id = ? AND phone_number_id = ?`).run(ruleId, waId, pn);
 }
 
 // ---------- الإعدادات العامة (ساعات العمل، الرد خارج الدوام) ----------
@@ -317,12 +416,14 @@ export function allSettings() {
   return out;
 }
 
-export function getLastAfterHours(waId) {
-  return db.prepare(`SELECT last_after_hours_at FROM conversations WHERE wa_id = ?`).get(waId)?.last_after_hours_at ?? 0;
+export function getLastAfterHours(waId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  return db.prepare(`SELECT last_after_hours_at FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, pn)?.last_after_hours_at ?? 0;
 }
 
-export function setLastAfterHours(waId, ts) {
-  db.prepare(`UPDATE conversations SET last_after_hours_at = ? WHERE wa_id = ?`).run(ts, waId);
+export function setLastAfterHours(waId, ts, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET last_after_hours_at = ? WHERE wa_id = ? AND phone_number_id = ?`).run(ts, waId, pn);
 }
 
 export function deleteBotRule(id) {
@@ -346,13 +447,15 @@ export function menuText(rule) {
   return [rule.response, ...lines].join('\n');
 }
 
-export function getConversationBot(waId) {
-  const row = db.prepare(`SELECT bot_enabled FROM conversations WHERE wa_id = ?`).get(waId);
+export function getConversationBot(waId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  const row = db.prepare(`SELECT bot_enabled FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, pn);
   return row ? row.bot_enabled : 1;
 }
 
-export function setConversationBot(waId, enabled) {
-  db.prepare(`UPDATE conversations SET bot_enabled = ? WHERE wa_id = ?`).run(enabled ? 1 : 0, waId);
+export function setConversationBot(waId, enabled, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET bot_enabled = ? WHERE wa_id = ? AND phone_number_id = ?`).run(enabled ? 1 : 0, waId, pn);
 }
 
 // ---------- الحملات ----------
@@ -509,8 +612,9 @@ export function reportSummary() {
   return { perDay, totals, campaigns, recipients, contacts, topConversations };
 }
 
-export function conversationExists(waId) {
-  return !!db.prepare(`SELECT 1 FROM conversations WHERE wa_id = ?`).get(waId);
+export function conversationExists(waId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  return !!db.prepare(`SELECT 1 FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, pn);
 }
 
 export function resetFailedRecipients(campaignId) {
@@ -520,8 +624,9 @@ export function resetFailedRecipients(campaignId) {
 
 // ---------- حالة المحادثة (مفتوحة/مغلقة) ----------
 
-export function setConversationStatus(waId, status) {
-  db.prepare(`UPDATE conversations SET status = ? WHERE wa_id = ?`).run(status, waId);
+export function setConversationStatus(waId, status, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET status = ? WHERE wa_id = ? AND phone_number_id = ?`).run(status, waId, pn);
 }
 
 // ---------- تعديل جهة اتصال ----------

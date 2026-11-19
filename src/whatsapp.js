@@ -32,9 +32,9 @@ async function graph(pathname, { method = 'GET', body } = {}) {
 }
 
 // إرسال رسالة نصية (داخل نافذة الـ 24 ساعة فقط)
-export async function sendText(to, body) {
+export async function sendText(to, body, phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
-  const data = await graph(`${PHONE_NUMBER_ID}/messages`, {
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
     body: {
       messaging_product: 'whatsapp',
@@ -48,9 +48,9 @@ export async function sendText(to, body) {
 }
 
 // إرسال قالب معتمد (للحملات وأول رسالة خارج النافذة)
-export async function sendTemplate(to, templateName, languageCode = 'ar') {
+export async function sendTemplate(to, templateName, languageCode = 'ar', phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
-  const data = await graph(`${PHONE_NUMBER_ID}/messages`, {
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
     body: {
       messaging_product: 'whatsapp',
@@ -133,11 +133,11 @@ export async function downloadMedia(url) {
 }
 
 // إرسال ميديا برابط عام (داخل نافذة الـ 24 ساعة): image/document/audio/video
-export async function sendMedia(to, type, link, caption = null) {
+export async function sendMedia(to, type, link, caption = null, phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const media = { link };
   if (caption && (type === 'image' || type === 'video' || type === 'document')) media.caption = caption;
-  const data = await graph(`${PHONE_NUMBER_ID}/messages`, {
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
     body: { messaging_product: 'whatsapp', to, type, [type]: media },
   });
@@ -145,7 +145,7 @@ export async function sendMedia(to, type, link, caption = null) {
 }
 
 // إرسال قالب مع هيدر ميديا اختياري (رابط صورة/مستند)
-export async function sendTemplateEx(to, templateName, languageCode = 'ar', header = null, bodyParams = []) {
+export async function sendTemplateEx(to, templateName, languageCode = 'ar', header = null, bodyParams = [], phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const components = [];
   if (header?.link && header?.type) {
@@ -158,7 +158,7 @@ export async function sendTemplateEx(to, templateName, languageCode = 'ar', head
   }
   const template = { name: templateName, language: { code: languageCode } };
   if (components.length) template.components = components;
-  const data = await graph(`${PHONE_NUMBER_ID}/messages`, {
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
     body: { messaging_product: 'whatsapp', to, type: 'template', template },
   });

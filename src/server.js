@@ -52,6 +52,11 @@ import {
   phonesForTag,
   conversationExists,
   setConversationStatus,
+  registerPhoneNumber,
+  listPhoneNumbers,
+  setPhoneNumberLabel,
+  deletePhoneNumber,
+  defaultPhoneNumberId,
   updateContact,
   getContact,
   listCanned,
@@ -186,7 +191,7 @@ app.post('/api/agents/:id/toggle', requireAdmin, (req, res) => {
 app.post('/api/conversations/:waId/assign', (req, res) => {
   const agentId = req.body?.agent_id ? Number(req.body.agent_id) : null;
   if (agentId && !getAgent(agentId)) return res.status(404).json({ error: 'الموظف غير موجود' });
-  assignConversation(req.params.waId, agentId);
+  assignConversation(req.params.waId, agentId, req.body?.pn ?? null);
   res.json({ ok: true });
 });
 
@@ -214,39 +219,39 @@ function isAfterHours() {
   return hm < sh * 60 + sm || hm >= eh * 60 + em;
 }
 
-async function sendBotText(waId, body) {
+async function sendBotText(waId, body, phoneNumberId = null) {
   try {
-    const result = await sendText(waId, body);
-    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body, bot: 1 });
+    const result = await sendText(waId, body, phoneNumberId);
+    insertOutbound({ waId, phoneNumberId, waMessageId: result?.messages?.[0]?.id, body, bot: 1 });
   } catch (err) {
     console.error('فشل رد البوت:', err.message);
   }
 }
 
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
-async function maybeBotReply(msg) {
+async function maybeBotReply(msg, phoneNumberId = null) {
   if (msg.type !== 'text') return;
   if (!getBotSettings().enabled) return;
-  if (!getConversationBot(msg.from)) return;
+  if (!getConversationBot(msg.from, phoneNumberId)) return;
   const text = msg.text?.body ?? '';
 
   // خارج الدوام: رد واحد كل 12 ساعة لكل محادثة ويتجاوز باقي القواعد
   if (isAfterHours()) {
-    if (Date.now() - getLastAfterHours(msg.from) > 12 * 3600 * 1000) {
-      await sendBotText(msg.from, getSetting('after_hours_message'));
-      setLastAfterHours(msg.from, Date.now());
+    if (Date.now() - getLastAfterHours(msg.from, phoneNumberId) > 12 * 3600 * 1000) {
+      await sendBotText(msg.from, getSetting('after_hours_message'), phoneNumberId);
+      setLastAfterHours(msg.from, Date.now(), phoneNumberId);
     }
     return;
   }
 
   // قائمة معلّقة: رد برقم الخيار
-  const pendingId = getPendingMenu(msg.from);
+  const pendingId = getPendingMenu(msg.from, phoneNumberId);
   if (pendingId) {
-    setPendingMenu(msg.from, null);
+    setPendingMenu(msg.from, null, phoneNumberId);
     const rule = getBotRule(pendingId);
     const opt = (rule?.options ?? []).find((o) => o.key === text.trim());
     if (opt) {
-      await sendBotText(msg.from, opt.reply);
+      await sendBotText(msg.from, opt.reply, phoneNumberId);
       return;
     }
     // لم يختر رقمًا صحيحًا: نكمل للمطابقة العادية
@@ -255,10 +260,10 @@ async function maybeBotReply(msg) {
   const rule = matchBotRule(text);
   if (!rule) return;
   if (rule.type === 'menu') {
-    await sendBotText(msg.from, menuText(rule));
-    setPendingMenu(msg.from, rule.id);
+    await sendBotText(msg.from, menuText(rule), phoneNumberId);
+    setPendingMenu(msg.from, rule.id, phoneNumberId);
   } else {
-    await sendBotText(msg.from, rule.response);
+    await sendBotText(msg.from, rule.response, phoneNumberId);
   }
 }
 
@@ -291,15 +296,18 @@ app.post('/webhook', (req, res) => {
       for (const entry of entries) {
         for (const change of entry.changes ?? []) {
           const value = change.value;
+          const phoneNumberId = value?.metadata?.phone_number_id ? String(value.metadata.phone_number_id) : null;
+          if (phoneNumberId) registerPhoneNumber(phoneNumberId, value?.metadata?.display_phone_number ?? null);
           if (value?.messages) {
             const contacts = value.contacts ?? [];
             for (const msg of value.messages) {
               const contact = contacts.find((c) => c.wa_id === msg.from);
-              const isNewConversation = !conversationExists(msg.from);
+              const isNewConversation = !conversationExists(msg.from, phoneNumberId);
               logWebhookEvent('message', `رسالة ${msg.type} من ${msg.from}`);
               const mediaObj = ['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type) ? msg[msg.type] : null;
               upsertInbound({
                 waId: msg.from,
+                phoneNumberId,
                 name: contact?.profile?.name ?? null,
                 waMessageId: msg.id,
                 type: msg.type,
@@ -316,9 +324,9 @@ app.post('/webhook', (req, res) => {
               }
               // رسالة ترحيب تلقائية لأول محادثة (عند تفعيلها من إعدادات البوت)
               if (isNewConversation && getSetting('welcome_enabled') === '1' && getBotSettings().enabled && getConversationBot(msg.from)) {
-                await sendBotText(msg.from, getSetting('welcome_message'));
+                await sendBotText(msg.from, getSetting('welcome_message'), phoneNumberId);
               }
-              await maybeBotReply(msg);
+              await maybeBotReply(msg, phoneNumberId);
             }
           }
           for (const st of value?.statuses ?? []) {
@@ -339,8 +347,29 @@ app.get('/api/conversations', (req, res) => {
   res.json({ conversations: listConversations(req.agent) });
 });
 
+// ---------- أرقام الواتساب المتصلة (الأقسام) ----------
+
+app.get('/api/phone-numbers', (req, res) => {
+  res.json({ phone_numbers: listPhoneNumbers(), default_id: defaultPhoneNumberId() });
+});
+
+app.post('/api/phone-numbers/:id/label', (req, res) => {
+  const label = String(req.body?.label ?? '').trim();
+  if (!label) return res.status(400).json({ error: 'اسم القسم مطلوب' });
+  if (!listPhoneNumbers().some((p) => p.phone_number_id === req.params.id)) return res.status(404).json({ error: 'الرقم غير موجود' });
+  setPhoneNumberLabel(req.params.id, label);
+  res.json({ ok: true, phone_numbers: listPhoneNumbers() });
+});
+
+// حذف رقم مسجّل (غير الافتراضي) — مفيد لو اتسجّل رقم بالغلط
+app.delete('/api/phone-numbers/:id', (req, res) => {
+  if (req.params.id === defaultPhoneNumberId()) return res.status(400).json({ error: 'لا يمكن حذف الرقم الافتراضي' });
+  deletePhoneNumber(req.params.id);
+  res.json({ ok: true, phone_numbers: listPhoneNumbers() });
+});
+
 app.get('/api/conversations/:waId/messages', (req, res) => {
-  res.json({ messages: listMessages(req.params.waId) });
+  res.json({ messages: listMessages(req.params.waId, req.query.pn || null) });
 });
 
 app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
@@ -348,19 +377,20 @@ app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
   const body = String(req.body?.body ?? '').trim();
   const mediaUrl = String(req.body?.media_url ?? '').trim();
   const mediaType = String(req.body?.media_type ?? 'image');
+  const pn = req.body?.phone_number_id ? String(req.body.phone_number_id) : null;
   if (!body && !mediaUrl) return res.status(400).json({ error: 'نص الرسالة أو رابط الميديا مطلوب' });
 
   let result;
   if (mediaUrl) {
     if (!/^https:\/\//.test(mediaUrl)) return res.status(400).json({ error: 'رابط الميديا لازم يبدأ بـ https://' });
-    result = await sendMedia(waId, mediaType, mediaUrl, body || null);
-    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl, sender: req.agent?.name ?? null });
+    result = await sendMedia(waId, mediaType, mediaUrl, body || null, pn);
+    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl, sender: req.agent?.name ?? null });
   } else {
-    result = await sendText(waId, body);
-    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body, sender: req.agent?.name ?? null });
+    result = await sendText(waId, body, pn);
+    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body, sender: req.agent?.name ?? null });
   }
   // تدخل بشري: نوقف البوت عن هذه المحادثة حتى يعاد تفعيله يدويًا
-  setConversationBot(waId, false);
+  setConversationBot(waId, false, pn);
   res.json({ ok: true, result });
 }));
 
@@ -389,7 +419,7 @@ app.get('/api/media/:messageId', wrap(async (req, res) => {
 
 // تفعيل/إيقاف البوت لمحادثة واحدة
 app.post('/api/conversations/:waId/bot', (req, res) => {
-  setConversationBot(req.params.waId, Boolean(req.body?.enabled));
+  setConversationBot(req.params.waId, Boolean(req.body?.enabled), req.body?.pn ?? null);
   res.json({ ok: true });
 });
 
@@ -608,18 +638,19 @@ app.post('/api/outbound/send', wrap(async (req, res) => {
   const key = req.headers['x-api-key'];
   if (!key || !touchApiKey(hashKey(key))) return res.status(401).json({ error: 'مفتاح API غير صالح' });
 
-  const { to, text, template_name, language_code, header_link, header_type } = req.body ?? {};
+  const { to, text, template_name, language_code, header_link, header_type, phone_number_id } = req.body ?? {};
+  const pn = phone_number_id ? String(phone_number_id) : null;
   const target = String(to ?? '').replace(/[^\d]/g, '');
   if (target.length < 8) return res.status(400).json({ error: 'رقم المستلم مطلوب بالصيغة الدولية' });
 
   let result;
   if (template_name) {
     const header = header_link ? { link: header_link, type: header_type ?? 'image' } : null;
-    result = await sendTemplateEx(target, template_name, language_code ?? 'ar', header);
-    insertOutbound({ waId: target, waMessageId: result?.messages?.[0]?.id, body: `[قالب: ${template_name}]`, type: 'template', sender: 'API' });
+    result = await sendTemplateEx(target, template_name, language_code ?? 'ar', header, [], pn);
+    insertOutbound({ waId: target, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: `[قالب: ${template_name}]`, type: 'template', sender: 'API' });
   } else if (text?.trim()) {
-    result = await sendText(target, text.trim());
-    insertOutbound({ waId: target, waMessageId: result?.messages?.[0]?.id, body: text.trim(), sender: 'API' });
+    result = await sendText(target, text.trim(), pn);
+    insertOutbound({ waId: target, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: text.trim(), sender: 'API' });
   } else {
     return res.status(400).json({ error: 'أرسل text أو template_name' });
   }
@@ -654,7 +685,7 @@ app.get('/api/reports/summary', (req, res) => {
 
 app.post('/api/conversations/:waId/status', (req, res) => {
   const status = req.body?.status === 'closed' ? 'closed' : 'open';
-  setConversationStatus(req.params.waId, status);
+  setConversationStatus(req.params.waId, status, req.body?.pn ?? null);
   res.json({ ok: true, status });
 });
 
