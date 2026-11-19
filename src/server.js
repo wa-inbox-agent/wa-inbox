@@ -278,6 +278,12 @@ app.get('/webhook', (req, res) => {
 
 app.post('/webhook', (req, res) => {
   res.sendStatus(200);
+  try {
+    const keys = Object.keys(req.body ?? {});
+    const entry = req.body?.entry?.[0];
+    const change = entry?.changes?.[0];
+    logWebhookEvent('raw', `object=${req.body?.object ?? '?'} keys=${keys.join('/')} field=${change?.field ?? '-'} messages=${change?.value?.messages?.length ?? 0} statuses=${change?.value?.statuses?.length ?? 0}`);
+  } catch {}
 
   (async () => {
     try {
