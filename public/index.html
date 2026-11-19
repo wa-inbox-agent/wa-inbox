@@ -530,7 +530,7 @@ const STATUS_LABELS = {
   sent: ['أُرسلت', 'Sent'], delivered: ['سُلّمت', 'Delivered'], read: ['قُرأت', 'Read'], skipped: ['تم تخطيها', 'Skipped'],
 };
 const statusLabel = (s) => (STATUS_LABELS[s] ? STATUS_LABELS[s][LANG === 'ar' ? 0 : 1] : s);
-const tr = (s) => (LANG === 'en' ? (I18N[s] ?? s) : s);
+const t9n = (s) => (LANG === 'en' ? (I18N[s] ?? s) : s);
 const origText = new WeakMap();
 function applyLang() {
   document.documentElement.lang = LANG;
@@ -598,7 +598,7 @@ $('logoutBtn').onclick = async () => {
 
 async function initMe(agent) {
   me = agent;
-  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? tr(' (مدير)') : '');
+  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? t9n(' (مدير)') : '');
   $('logoutBtn').hidden = false;
   $('agentsNav').hidden = agent.role !== 'admin';
   $('apiNav').hidden = agent.role !== 'admin';
@@ -613,7 +613,7 @@ async function loadAgents() {
     tb.innerHTML = '';
     for (const a of agents) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td dir="ltr">${a.username}</td><td>${a.name}</td><td>${a.role === 'admin' ? tr('مدير') : tr('موظف')}</td><td><input type="checkbox" ${a.active ? 'checked' : ''} onchange="toggleAgent(${a.id}, this.checked)" /></td>`;
+      tr.innerHTML = `<td dir="ltr">${a.username}</td><td>${a.name}</td><td>${a.role === 'admin' ? t9n('مدير') : t9n('موظف')}</td><td><input type="checkbox" ${a.active ? 'checked' : ''} onchange="toggleAgent(${a.id}, this.checked)" /></td>`;
       tb.appendChild(tr);
     }
   } catch {}
@@ -645,13 +645,13 @@ async function assignTo(agentId) {
 function renderAssignArea(assignedName, assignedId) {
   const el = $('assignArea');
   if (!me) { el.innerHTML = ''; return; }
-  let html = assignedName ? `📌 ${assignedName}` : tr('📌 غير مسندة');
+  let html = assignedName ? `📌 ${assignedName}` : t9n('📌 غير مسندة');
   if (me.role === 'admin' && agentList.length) {
-    html += ` <select id="assignSel" style="width:auto;padding:2px 6px;font-size:12px"><option value="">${tr('فك الإسناد')}</option>${agentList.filter((a) => a.active).map((a) => `<option value="${a.id}" ${a.id === assignedId ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`;
+    html += ` <select id="assignSel" style="width:auto;padding:2px 6px;font-size:12px"><option value="">${t9n('فك الإسناد')}</option>${agentList.filter((a) => a.active).map((a) => `<option value="${a.id}" ${a.id === assignedId ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`;
   } else if (!assignedName) {
-    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(${me.id})">${tr('إسناد إليّ')}</button>`;
+    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(${me.id})">${t9n('إسناد إليّ')}</button>`;
   } else if (assignedId === me.id) {
-    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(null)">${tr('فك الإسناد')}</button>`;
+    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(null)">${t9n('فك الإسناد')}</button>`;
   }
   el.innerHTML = html;
   const sel = $('assignSel');
@@ -678,7 +678,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
 async function loadHealth() {
   try {
     const h = await api('/api/health');
-    $('health').textContent = h.configured ? tr('متصل بميتا') : tr('بيانات ميتا ناقصة');
+    $('health').textContent = h.configured ? t9n('متصل بميتا') : t9n('بيانات ميتا ناقصة');
     $('health').className = h.configured ? 'ok' : 'bad';
   } catch {}
 }
@@ -699,7 +699,7 @@ async function loadConvos() {
   lastConversations = conversations;
   renderConvos();
   const totalUnread = conversations.filter((c) => c.status !== 'closed').reduce((sum, c) => sum + (c.unread || 0), 0);
-  document.title = totalUnread ? `(${totalUnread}) ${tr('صندوق الوارد')}` : tr('صندوق الوارد');
+  document.title = totalUnread ? `(${totalUnread}) ${t9n('صندوق الوارد')}` : t9n('صندوق الوارد');
 }
 function renderConvos() {
   const q = ($('convoSearch').value || '').trim();
@@ -722,7 +722,7 @@ function renderConvos() {
     div.onclick = () => openConvo(c);
     $('convos').appendChild(div);
   }
-  if (!list.length) $('convos').innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px">' + tr('لا محادثات مطابقة') + '</div>';
+  if (!list.length) $('convos').innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px">' + t9n('لا محادثات مطابقة') + '</div>';
 }
 document.querySelectorAll('#convoFilters .chip').forEach((b) => (b.onclick = () => {
   document.querySelectorAll('#convoFilters .chip').forEach((x) => x.classList.remove('active'));
@@ -738,7 +738,7 @@ async function openConvo(c) {
   $('chatHeader').hidden = $('messages').hidden = $('composer').hidden = false;
   $('chatTitle').textContent = (c.name || c.wa_id) + ' — ' + c.wa_id;
   $('convBotToggle').checked = Boolean(c.bot_enabled);
-  $('convoStatusBtn').textContent = c.status === 'closed' ? tr('↩️ إعادة فتح المحادثة') : tr('✔️ إغلاق المحادثة');
+  $('convoStatusBtn').textContent = c.status === 'closed' ? t9n('↩️ إعادة فتح المحادثة') : t9n('✔️ إغلاق المحادثة');
   renderAssignArea(c.assigned_name ?? null, c.assigned_to ?? null);
   loadContactPanel(c.wa_id);
   await loadMessages();
@@ -750,7 +750,7 @@ $('convoStatusBtn').onclick = async () => {
   const c = lastConversations.find((x) => x.wa_id === currentWaId);
   const next = c?.status === 'closed' ? 'open' : 'closed';
   await api(`/api/conversations/${currentWaId}/status`, { body: { status: next } });
-  $('convoStatusBtn').textContent = next === 'closed' ? tr('↩️ إعادة فتح المحادثة') : tr('✔️ إغلاق المحادثة');
+  $('convoStatusBtn').textContent = next === 'closed' ? t9n('↩️ إعادة فتح المحادثة') : t9n('✔️ إغلاق المحادثة');
   loadConvos();
 };
 
@@ -764,7 +764,7 @@ async function loadContactPanel(waId) {
     $('cpTags').value = c.tags || '';
     $('cpNotes').value = c.notes || '';
     $('cpOptOut').dataset.state = c.opted_out ? '1' : '0';
-    $('cpOptOut').textContent = c.opted_out ? tr('إعادة تفعيل استقبال الحملات') : tr('إيقاف الحملات عنه (opt-out)');
+    $('cpOptOut').textContent = c.opted_out ? t9n('إعادة تفعيل استقبال الحملات') : t9n('إيقاف الحملات عنه (opt-out)');
   } catch {
     $('cpName').value = $('cpTags').value = $('cpNotes').value = '';
   }
@@ -794,7 +794,7 @@ async function loadTeamNotes() {
   try {
     const { notes } = await api(`/api/conversations/${currentWaId}/notes`);
     $('cpTeamNotes').innerHTML = notes.map((n) => `<div class="note"><div>${esc(n.body)}</div><div class="meta">${esc(n.agent_name || '')} · ${fmtTime(n.created_at)}</div></div>`).join('')
-      || '<div style="color:var(--muted);font-size:12px">' + tr('لا ملاحظات بعد') + '</div>';
+      || '<div style="color:var(--muted);font-size:12px">' + t9n('لا ملاحظات بعد') + '</div>';
   } catch {}
 }
 
@@ -809,7 +809,7 @@ $('cpNoteAdd').onclick = async () => {
 async function loadCannedPicker() {
   try {
     const { canned } = await api('/api/canned');
-    $('cannedPick').innerHTML = '<option value="">' + tr('⚡ رد جاهز') + '</option>' + canned.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join('');
+    $('cannedPick').innerHTML = '<option value="">' + t9n('⚡ رد جاهز') + '</option>' + canned.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join('');
   } catch {}
 }
 $('cannedPick').onchange = async () => {
@@ -839,11 +839,11 @@ async function loadMessages() {
       if (m.type === 'image' || m.type === 'sticker') mediaHtml = `<a href="${url}" target="_blank"><img src="${url}" style="max-width:240px;border-radius:6px;display:block" loading="lazy" /></a>`;
       else if (m.type === 'video') mediaHtml = `<video src="${url}" controls style="max-width:240px;border-radius:6px"></video>`;
       else if (m.type === 'audio' || m.type === 'voice') mediaHtml = `<audio src="${url}" controls></audio>`;
-      else mediaHtml = `<a href="${url}" target="_blank" style="color:var(--info)">📎 ${m.filename || tr('مستند مرفق')}</a>`;
+      else mediaHtml = `<a href="${url}" target="_blank" style="color:var(--info)">📎 ${m.filename || t9n('مستند مرفق')}</a>`;
     } else if (m.type !== 'text') {
       mediaHtml = `<span style="color:var(--muted)">[${m.type}]</span> `;
     }
-    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">' + tr('🤖 بوت') + '</span> ' : ''}${m.sender ? `<span style="color:var(--purple)">${m.sender}</span> ` : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">' + t9n('🤖 بوت') + '</span> ' : ''}${m.sender ? `<span style="color:var(--purple)">${m.sender}</span> ` : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
     $('messages').appendChild(div);
   }
   $('messages').scrollTop = $('messages').scrollHeight;
@@ -858,7 +858,7 @@ $('composer').onsubmit = async (e) => {
   $('replyInput').value = $('replyMediaUrl').value = '';
   try {
     await api(`/api/conversations/${currentWaId}/reply`, { body: { body, media_url: media_type ? media_url : '', media_type } });
-  } catch (err) { alert(tr('فشل الإرسال: ') + err.message); }
+  } catch (err) { alert(t9n('فشل الإرسال: ') + err.message); }
   await loadMessages();
   loadConvos();
 };
@@ -873,10 +873,10 @@ async function loadTemplates() {
     for (const t of templates) {
       const bodyText = (t.components ?? []).find((c) => c.type === 'BODY')?.text ?? '';
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td style="font-size:12px;max-width:260px;white-space:pre-wrap">${esc(bodyText).slice(0, 120)}</td><td><span class="pill ${t.status}">${statusLabel(t.status)}</span></td><td style="white-space:nowrap"><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="testTemplate('${t.name}', '${t.language}')">${tr('تجربة')}</button> <button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delTemplate('${t.name}')">${tr('حذف')}</button></td>`;
+      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td style="font-size:12px;max-width:260px;white-space:pre-wrap">${esc(bodyText).slice(0, 120)}</td><td><span class="pill ${t.status}">${statusLabel(t.status)}</span></td><td style="white-space:nowrap"><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="testTemplate('${t.name}', '${t.language}')">${t9n('تجربة')}</button> <button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delTemplate('${t.name}')">${t9n('حذف')}</button></td>`;
       tb.appendChild(tr);
     }
-    if (!templates.length) tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' + tr('لا توجد قوالب بعد') + '</td></tr>';
+    if (!templates.length) tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' + t9n('لا توجد قوالب بعد') + '</td></tr>';
   } catch (err) {
     $('tplErr').textContent = err.message;
     $('tplErr').style.display = 'block';
@@ -915,19 +915,19 @@ $('tplCreate').onclick = async () => {
 };
 
 async function delTemplate(name) {
-  if (!confirm(`${tr('حذف القالب')} ${name} ${tr('نهائيًا من حساب واتساب؟')}`)) return;
+  if (!confirm(`${t9n('حذف القالب')} ${name} ${t9n('نهائيًا من حساب واتساب؟')}`)) return;
   await api(`/api/templates/${encodeURIComponent(name)}`, { method: 'DELETE' });
   loadTemplates();
 }
 window.delTemplate = delTemplate;
 
 async function testTemplate(name, lang) {
-  const to = prompt(`${tr('إرسال القالب')} ${name} ${tr('تجريبيًا إلى رقم (بالصيغة الدولية بدون +):')}`, '966');
+  const to = prompt(`${t9n('إرسال القالب')} ${name} ${t9n('تجريبيًا إلى رقم (بالصيغة الدولية بدون +):')}`, '966');
   if (!to) return;
   try {
     await api('/api/templates/test', { body: { to, template_name: name, language_code: lang || 'ar' } });
-    alert(tr('تم الإرسال ✓'));
-  } catch (err) { alert(tr('فشل الإرسال: ') + err.message); }
+    alert(t9n('تم الإرسال ✓'));
+  } catch (err) { alert(t9n('فشل الإرسال: ') + err.message); }
 }
 window.testTemplate = testTemplate;
 
@@ -939,7 +939,7 @@ async function loadApprovedTemplates() {
     approvedTpls = templates.filter((t) => t.status === 'APPROVED');
     const sel = $('campTemplate');
     sel.innerHTML = '';
-    if (!approvedTpls.length) sel.innerHTML = '<option value="">' + tr('لا توجد قوالب معتمدة بعد') + '</option>';
+    if (!approvedTpls.length) sel.innerHTML = '<option value="">' + t9n('لا توجد قوالب معتمدة بعد') + '</option>';
     for (const t of approvedTpls) sel.innerHTML += `<option value="${t.name}" data-lang="${t.language}">${t.name} (${t.language})</option>`;
     renderCampTplPreview();
   } catch {}
@@ -955,8 +955,8 @@ function renderCampTplPreview() {
   prev.style.display = bodyText ? 'block' : 'none';
   const count = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
   if (count > 0) {
-    vars.innerHTML = '<label>' + tr('قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)') + '</label>' +
-      Array.from({ length: count }, (_, i) => `<input class="campVar" placeholder="${tr('قيمة')} {{${i + 1}}}" style="margin-bottom:6px" />`).join('');
+    vars.innerHTML = '<label>' + t9n('قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)') + '</label>' +
+      Array.from({ length: count }, (_, i) => `<input class="campVar" placeholder="${t9n('قيمة')} {{${i + 1}}}" style="margin-bottom:6px" />`).join('');
   }
 }
 $('campTemplate').onchange = renderCampTplPreview;
@@ -967,16 +967,16 @@ async function loadCampaigns() {
   tb.innerHTML = '';
   for (const c of campaigns) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${statusLabel(c.status)}</span></td><td style="font-size:12px">${c.scheduled_at ? fmtTime(c.scheduled_at) : '—'}</td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">${tr('التفاصيل')}</button></td>`;
+    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${statusLabel(c.status)}</span></td><td style="font-size:12px">${c.scheduled_at ? fmtTime(c.scheduled_at) : '—'}</td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">${t9n('التفاصيل')}</button></td>`;
     tb.appendChild(tr);
   }
-  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">' + tr('لا توجد حملات بعد') + '</td></tr>';
+  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">' + t9n('لا توجد حملات بعد') + '</td></tr>';
 }
 
 async function showCampaign(id, name) {
   const { recipients } = await api(`/api/campaigns/${id}`);
   $('campDetail').hidden = false;
-  $('campDetailTitle').textContent = tr('مستلمو حملة') + ': ' + name;
+  $('campDetailTitle').textContent = t9n('مستلمو حملة') + ': ' + name;
   const tb = document.querySelector('#campRecTable tbody');
   tb.innerHTML = '';
   for (const r of recipients) {
@@ -997,7 +997,7 @@ $('campRetry').onclick = async () => {
   if (!currentCampaignId) return;
   try {
     const r = await api(`/api/campaigns/${currentCampaignId}/retry-failed`, { body: {} });
-    alert(r.count ? `${tr('أُعيد إرسال')} ${r.count} ${tr('رسالة فاشلة')}` : tr('لا توجد رسائل فاشلة'));
+    alert(r.count ? `${t9n('أُعيد إرسال')} ${r.count} ${t9n('رسالة فاشلة')}` : t9n('لا توجد رسائل فاشلة'));
     showCampaign(currentCampaignId, currentCampaignName);
     loadCampaigns();
   } catch (err) { alert(err.message); }
@@ -1026,7 +1026,7 @@ $('campCreate').onclick = async () => {
     $('campSchedule').value = '';
     loadCampaigns();
     setTimeout(loadCampaigns, 5000);
-    alert(scheduled_at ? `${tr('اتجدولت الحملة لـ')} ${r.total} ${tr('رقم')}` : `${tr('بدأت الحملة لـ')} ${r.total} ${tr('رقم')}`);
+    alert(scheduled_at ? `${t9n('اتجدولت الحملة لـ')} ${r.total} ${t9n('رقم')}` : `${t9n('بدأت الحملة لـ')} ${r.total} ${t9n('رقم')}`);
   } catch (err) {
     $('campErr').textContent = err.message;
     $('campErr').style.display = 'block';
@@ -1040,10 +1040,10 @@ async function loadContacts() {
   tb.innerHTML = '';
   for (const c of contacts) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td dir="ltr">${c.phone}</td><td>${c.name || '—'}</td><td>${c.tags || '—'}</td><td><input type="checkbox" ${c.opted_out ? '' : 'checked'} onchange="toggleOptOut('${c.phone}', !this.checked)" /></td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delContact('${c.phone}')">${tr('حذف')}</button></td>`;
+    tr.innerHTML = `<td dir="ltr">${c.phone}</td><td>${c.name || '—'}</td><td>${c.tags || '—'}</td><td><input type="checkbox" ${c.opted_out ? '' : 'checked'} onchange="toggleOptOut('${c.phone}', !this.checked)" /></td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delContact('${c.phone}')">${t9n('حذف')}</button></td>`;
     tb.appendChild(tr);
   }
-  if (!contacts.length) tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' + tr('لا توجد جهات اتصال بعد') + '</td></tr>';
+  if (!contacts.length) tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' + t9n('لا توجد جهات اتصال بعد') + '</td></tr>';
 }
 
 $('conImportBtn').onclick = async () => {
@@ -1052,7 +1052,7 @@ $('conImportBtn').onclick = async () => {
     const r = await api('/api/contacts/import', { body: { text: $('conImport').value } });
     $('conImport').value = '';
     loadContacts();
-    alert(`${tr('تم استيراد/تحديث')} ${r.count} ${tr('جهة اتصال')}`);
+    alert(`${t9n('تم استيراد/تحديث')} ${r.count} ${t9n('جهة اتصال')}`);
   } catch (err) {
     $('conErr').textContent = err.message;
     $('conErr').style.display = 'block';
@@ -1079,17 +1079,17 @@ async function loadBot() {
   for (const r of rules) {
     const tr = document.createElement('tr');
     const opts = r.options ? (typeof r.options === 'string' ? JSON.parse(r.options) : r.options) : null;
-    tr.innerHTML = `<td>${r.type === 'menu' ? tr('📋 قائمة') : tr('💬 رد')}</td><td>${r.keyword}</td><td>${r.response}${opts ? '<br><span style="color:var(--muted);font-size:12px">' + opts.map((o) => o.key + ') ' + o.label).join(' — ') + '</span>' : ''}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">${tr('حذف')}</button></td>`;
+    tr.innerHTML = `<td>${r.type === 'menu' ? t9n('📋 قائمة') : t9n('💬 رد')}</td><td>${r.keyword}</td><td>${r.response}${opts ? '<br><span style="color:var(--muted);font-size:12px">' + opts.map((o) => o.key + ') ' + o.label).join(' — ') + '</span>' : ''}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">${t9n('حذف')}</button></td>`;
     tb.appendChild(tr);
   }
-  if (!rules.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">' + tr('لا توجد قواعد بعد') + '</td></tr>';
+  if (!rules.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">' + t9n('لا توجد قواعد بعد') + '</td></tr>';
   loadAfterHours();
 }
 
 $('ruleType').onchange = (e) => {
   const menu = e.target.value === 'menu';
   $('menuOptions').hidden = !menu;
-  $('ruleResponseLabel').textContent = menu ? tr('نص يظهر فوق الخيارات') : tr('يرد بـ');
+  $('ruleResponseLabel').textContent = menu ? t9n('نص يظهر فوق الخيارات') : t9n('يرد بـ');
 };
 
 async function loadAfterHours() {
@@ -1103,7 +1103,7 @@ async function loadAfterHours() {
 
 $('ahSave').onclick = async () => {
   await api('/api/bot/after-hours', { body: { enabled: $('ahEnabled').checked, work_start: $('ahStart').value.trim(), work_end: $('ahEnd').value.trim(), work_days: $('ahDays').value.trim(), message: $('ahMessage').value } });
-  alert(tr('تم حفظ إعدادات خارج الدوام'));
+  alert(t9n('تم حفظ إعدادات خارج الدوام'));
 };
 
 $('botGlobal').onchange = async (e) => { await api('/api/bot/toggle', { body: { enabled: e.target.checked } }); };
@@ -1135,14 +1135,14 @@ async function loadReports() {
   const r = await api('/api/reports/summary');
   const card = (t, v) => `<div class="card"><h3>${t}</h3><div class="stat-num">${v ?? 0}</div></div>`;
   $('repCards').innerHTML =
-    card(tr('رسائل واردة'), r.totals.inbound) + card(tr('رسائل صادرة'), r.totals.outbound) +
-    card(tr('ردود البوت'), r.totals.bot_replies) + card(tr('جهات الاتصال'), r.contacts.total) +
-    card(tr('ألغوا الاشتراك'), r.contacts.opted_out) + card(tr('حملات'), r.campaigns.total) +
-    card(tr('رسائل حملات ناجحة'), r.recipients.sent) + card(tr('فاشلة'), r.recipients.failed);
+    card(t9n('رسائل واردة'), r.totals.inbound) + card(t9n('رسائل صادرة'), r.totals.outbound) +
+    card(t9n('ردود البوت'), r.totals.bot_replies) + card(t9n('جهات الاتصال'), r.contacts.total) +
+    card(t9n('ألغوا الاشتراك'), r.contacts.opted_out) + card(t9n('حملات'), r.campaigns.total) +
+    card(t9n('رسائل حملات ناجحة'), r.recipients.sent) + card(t9n('فاشلة'), r.recipients.failed);
   const tb = document.querySelector('#repTable tbody');
   tb.innerHTML = '';
   for (const d of r.perDay) tb.innerHTML += `<tr><td dir="ltr">${d.day}</td><td>${d.inbound}</td><td>${d.outbound}</td></tr>`;
-  if (!r.perDay.length) tb.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">' + tr('لا رسائل بعد') + '</td></tr>';
+  if (!r.perDay.length) tb.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">' + t9n('لا رسائل بعد') + '</td></tr>';
   const tp = document.querySelector('#repTop tbody');
   tp.innerHTML = '';
   for (const c of r.topConversations) tp.innerHTML += `<tr><td dir="ltr">${c.wa_id}</td><td>${c.messages}</td></tr>`;
@@ -1154,11 +1154,11 @@ async function loadWebhookCard() {
   try {
     const w = await api('/api/webhook-events');
     $('whStatus').innerHTML = w.last_inbound_at
-      ? `<span style="color:var(--ok)">${tr('✓ الـ Webhook يستلم — آخر رسالة واردة: ')}${fmtTime(w.last_inbound_at)}</span>`
-      : `<span style="color:var(--warn)">${tr('⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.')}</span>`;
+      ? `<span style="color:var(--ok)">${t9n('✓ الـ Webhook يستلم — آخر رسالة واردة: ')}${fmtTime(w.last_inbound_at)}</span>`
+      : `<span style="color:var(--warn)">${t9n('⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.')}</span>`;
     const tb = document.querySelector('#whEvents tbody');
-    tb.innerHTML = w.events.map((e) => `<tr><td dir="ltr" style="white-space:nowrap">${fmtTime(e.created_at)}</td><td>${e.kind === 'message' ? tr('رسالة') : tr('حالة')}</td><td dir="ltr" style="font-size:12px">${esc(e.summary || '')}</td></tr>`).join('')
-      || '<tr><td colspan="3" style="color:var(--muted)">' + tr('لا أحداث بعد') + '</td></tr>';
+    tb.innerHTML = w.events.map((e) => `<tr><td dir="ltr" style="white-space:nowrap">${fmtTime(e.created_at)}</td><td>${e.kind === 'message' ? t9n('رسالة') : t9n('حالة')}</td><td dir="ltr" style="font-size:12px">${esc(e.summary || '')}</td></tr>`).join('')
+      || '<tr><td colspan="3" style="color:var(--muted)">' + t9n('لا أحداث بعد') + '</td></tr>';
   } catch {}
 }
 window.loadWebhookCard = loadWebhookCard;
@@ -1172,10 +1172,10 @@ async function loadKeys() {
     tb.innerHTML = '';
     for (const k of keys) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${k.label}</td><td style="font-size:12px">${fmtTime(k.created_at)}</td><td style="font-size:12px">${k.last_used_at ? fmtTime(k.last_used_at) : tr('لم يستخدم')}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delKey(${k.id})">${tr('حذف')}</button></td>`;
+      tr.innerHTML = `<td>${k.label}</td><td style="font-size:12px">${fmtTime(k.created_at)}</td><td style="font-size:12px">${k.last_used_at ? fmtTime(k.last_used_at) : t9n('لم يستخدم')}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delKey(${k.id})">${t9n('حذف')}</button></td>`;
       tb.appendChild(tr);
     }
-    if (!keys.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">' + tr('لا مفاتيح بعد') + '</td></tr>';
+    if (!keys.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">' + t9n('لا مفاتيح بعد') + '</td></tr>';
   } catch {}
 }
 window.loadKeys = loadKeys;
@@ -1184,7 +1184,7 @@ $('keyCreate').onclick = async () => {
   $('keyErr').style.display = 'none';
   try {
     const r = await api('/api/keys', { body: { label: $('keyLabel').value.trim() } });
-    $('keyResult').textContent = tr('المفتاح (يظهر مرة واحدة): ') + r.key;
+    $('keyResult').textContent = t9n('المفتاح (يظهر مرة واحدة): ') + r.key;
     $('keyLabel').value = '';
     loadKeys();
   } catch (err) {
@@ -1201,13 +1201,13 @@ async function delRule(id) { await api(`/api/bot/rules/${id}`, { method: 'DELETE
 async function loadCanned() {
   const { canned } = await api('/api/canned');
   const tb = document.querySelector('#cnTable tbody');
-  tb.innerHTML = canned.map((c) => `<tr><td>${esc(c.title)}</td><td>${esc(c.body)}</td><td><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delCanned(${c.id})">${tr('حذف')}</button></td></tr>`).join('')
-    || '<tr><td colspan="3" style="color:var(--muted)">' + tr('لا ردود جاهزة بعد') + '</td></tr>';
+  tb.innerHTML = canned.map((c) => `<tr><td>${esc(c.title)}</td><td>${esc(c.body)}</td><td><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delCanned(${c.id})">${t9n('حذف')}</button></td></tr>`).join('')
+    || '<tr><td colspan="3" style="color:var(--muted)">' + t9n('لا ردود جاهزة بعد') + '</td></tr>';
 }
 $('cnAdd').onclick = async () => {
   const title = $('cnTitle').value.trim();
   const body = $('cnBody').value.trim();
-  if (!title || !body) return alert(tr('العنوان والنص مطلوبان'));
+  if (!title || !body) return alert(t9n('العنوان والنص مطلوبان'));
   await api('/api/canned', { body: { title, body } });
   $('cnTitle').value = $('cnBody').value = '';
   loadCanned();
@@ -1223,7 +1223,7 @@ async function loadWelcome() {
 }
 $('wcSave').onclick = async () => {
   await api('/api/bot/welcome', { body: { enabled: $('wcEnabled').checked, message: $('wcMessage').value } });
-  alert(tr('تم حفظ رسالة الترحيب'));
+  alert(t9n('تم حفظ رسالة الترحيب'));
 };
 window.delRule = delRule;
 
