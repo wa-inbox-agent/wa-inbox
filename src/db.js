@@ -9,27 +9,67 @@ const db = new DatabaseSync(path.join(dataDir, 'wa-inbox.db'));
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS conversations (
-  wa_id TEXT PRIMARY KEY,          -- رقم العميل بصيغة دولية بدون +
-  name TEXT,                       -- اسم العميل من بروفايل واتساب
+  wa_id TEXT PRIMARY KEY,
+  name TEXT,
   last_message TEXT,
-  last_message_at INTEGER,         -- milliseconds
-  unread INTEGER NOT NULL DEFAULT 0
+  last_message_at INTEGER,
+  unread INTEGER NOT NULL DEFAULT 0,
+  bot_enabled INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  wa_message_id TEXT,              -- معرّف الرسالة عند واتساب (wamid)
-  wa_id TEXT NOT NULL,             -- رقم العميل
-  direction TEXT NOT NULL,         -- inbound | outbound
+  wa_message_id TEXT,
+  wa_id TEXT NOT NULL,
+  direction TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'text',
   body TEXT,
-  status TEXT NOT NULL DEFAULT 'received', -- received | sent | delivered | read | failed
-  created_at INTEGER NOT NULL      -- milliseconds
+  status TEXT NOT NULL DEFAULT 'received',
+  bot INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_wamid ON messages(wa_message_id);
+
+CREATE TABLE IF NOT EXISTS bot_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS bot_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  keyword TEXT NOT NULL,
+  response TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS campaigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  template_name TEXT NOT NULL,
+  language_code TEXT NOT NULL DEFAULT 'ar',
+  status TEXT NOT NULL DEFAULT 'draft',
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS campaign_recipients (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER NOT NULL,
+  wa_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  wa_message_id TEXT,
+  error TEXT,
+  updated_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_recipients_campaign ON campaign_recipients(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_recipients_wamid ON campaign_recipients(wa_message_id);
 `);
+
+// ترقية قواعد قديمة لا تحتوي الأعمدة الجديدة
+try { db.exec(`ALTER TABLE conversations ADD COLUMN bot_enabled INTEGER NOT NULL DEFAULT 1`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN bot INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { db.exec(`INSERT OR IGNORE INTO bot_settings (id, enabled) VALUES (1, 1)`); } catch {}
 
 const now = () => Date.now();
 
@@ -51,12 +91,12 @@ export function upsertInbound({ waId, name, waMessageId, type, body, ts }) {
   ).run(waId, name ?? null, body ?? `[${type}]`, t);
 }
 
-export function insertOutbound({ waId, waMessageId, body }) {
+export function insertOutbound({ waId, waMessageId, body, bot = 0 }) {
   const t = now();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, created_at)
-     VALUES (?, ?, 'outbound', 'text', ?, 'sent', ?)`
-  ).run(waMessageId ?? null, waId, body, t);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, created_at)
+     VALUES (?, ?, 'outbound', 'text', ?, 'sent', ?, ?)`
+  ).run(waMessageId ?? null, waId, body, bot, t);
 
   db.prepare(
     `INSERT INTO conversations (wa_id, last_message, last_message_at, unread)
@@ -69,17 +109,115 @@ export function insertOutbound({ waId, waMessageId, body }) {
 
 export function updateStatus(waMessageId, status) {
   db.prepare(`UPDATE messages SET status = ? WHERE wa_message_id = ?`).run(status, waMessageId);
+  // تحديث مستلمي الحملات المرتبطين بنفس الرسالة
+  db.prepare(
+    `UPDATE campaign_recipients SET status = ?, updated_at = ? WHERE wa_message_id = ?`
+  ).run(status, now(), waMessageId);
 }
 
 export function listConversations() {
-  return db
-    .prepare(`SELECT * FROM conversations ORDER BY last_message_at DESC`)
-    .all();
+  return db.prepare(`SELECT * FROM conversations ORDER BY last_message_at DESC`).all();
 }
 
 export function listMessages(waId) {
   db.prepare(`UPDATE conversations SET unread = 0 WHERE wa_id = ?`).run(waId);
+  return db.prepare(`SELECT * FROM messages WHERE wa_id = ? ORDER BY created_at ASC`).all(waId);
+}
+
+// ---------- البوت ----------
+
+export function getBotSettings() {
+  return db.prepare(`SELECT enabled FROM bot_settings WHERE id = 1`).get() ?? { enabled: 1 };
+}
+
+export function setBotEnabled(enabled) {
+  db.prepare(`UPDATE bot_settings SET enabled = ? WHERE id = 1`).run(enabled ? 1 : 0);
+}
+
+export function listBotRules() {
+  return db.prepare(`SELECT * FROM bot_rules ORDER BY id ASC`).all();
+}
+
+export function addBotRule(keyword, response) {
+  const r = db.prepare(`INSERT INTO bot_rules (keyword, response, created_at) VALUES (?, ?, ?)`).run(
+    keyword.trim(),
+    response.trim(),
+    now()
+  );
+  return r.lastInsertRowid;
+}
+
+export function deleteBotRule(id) {
+  db.prepare(`DELETE FROM bot_rules WHERE id = ?`).run(id);
+}
+
+// إيجاد أول قاعدة تطابق نص الرسالة؛ القاعدة ذات الكلمة المفتاحية * تطابق أي رسالة
+export function matchBotRule(text) {
+  const lower = String(text ?? '').toLowerCase();
+  for (const rule of listBotRules()) {
+    if (rule.keyword === '*') return rule;
+    if (lower.includes(rule.keyword.toLowerCase())) return rule;
+  }
+  return null;
+}
+
+export function getConversationBot(waId) {
+  const row = db.prepare(`SELECT bot_enabled FROM conversations WHERE wa_id = ?`).get(waId);
+  return row ? row.bot_enabled : 1;
+}
+
+export function setConversationBot(waId, enabled) {
+  db.prepare(`UPDATE conversations SET bot_enabled = ? WHERE wa_id = ?`).run(enabled ? 1 : 0, waId);
+}
+
+// ---------- الحملات ----------
+
+export function createCampaign({ name, templateName, languageCode, numbers }) {
+  const t = now();
+  const r = db
+    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, created_at) VALUES (?, ?, ?, 'draft', ?)`)
+    .run(name, templateName, languageCode ?? 'ar', t);
+  const id = Number(r.lastInsertRowid);
+  const ins = db.prepare(`INSERT INTO campaign_recipients (campaign_id, wa_id) VALUES (?, ?)`);
+  for (const n of numbers) ins.run(id, n);
+  return id;
+}
+
+export function listCampaigns() {
   return db
-    .prepare(`SELECT * FROM messages WHERE wa_id = ? ORDER BY created_at ASC`)
-    .all(waId);
+    .prepare(
+      `SELECT c.*,
+        (SELECT count(*) FROM campaign_recipients r WHERE r.campaign_id = c.id) AS total,
+        (SELECT count(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status IN ('sent','delivered','read')) AS sent,
+        (SELECT count(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'delivered') AS delivered,
+        (SELECT count(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'read') AS read,
+        (SELECT count(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'failed') AS failed
+       FROM campaigns c ORDER BY c.id DESC`
+    )
+    .all();
+}
+
+export function getCampaign(id) {
+  const campaign = db.prepare(`SELECT * FROM campaigns WHERE id = ?`).get(id);
+  if (!campaign) return null;
+  const recipients = db
+    .prepare(`SELECT * FROM campaign_recipients WHERE campaign_id = ? ORDER BY id ASC`)
+    .all(id);
+  return { campaign, recipients };
+}
+
+export function setCampaignStatus(id, status) {
+  db.prepare(`UPDATE campaigns SET status = ? WHERE id = ?`).run(status, id);
+}
+
+export function pendingRecipients(id) {
+  return db
+    .prepare(`SELECT * FROM campaign_recipients WHERE campaign_id = ? AND status = 'pending' ORDER BY id ASC`)
+    .all(id);
+}
+
+export function markRecipient(id, { status, waMessageId = null, error = null }) {
+  db.prepare(
+    `UPDATE campaign_recipients SET status = ?, wa_message_id = COALESCE(?, wa_message_id), error = ?, updated_at = ? WHERE id = ?`
+  ).run(status, waMessageId, error, now(), id);
 }

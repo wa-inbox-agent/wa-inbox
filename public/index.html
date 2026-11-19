@@ -3,96 +3,216 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>صندوق وارد واتساب</title>
+<title>منصة واتساب</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-    background: #0b141a; color: #e9edef;
-    height: 100vh; display: flex; flex-direction: column;
-  }
-  header {
-    background: #202c33; padding: 10px 16px;
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 600; font-size: 17px;
-  }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #0b141a; color: #e9edef; height: 100vh; display: flex; flex-direction: column; }
+  header { background: #202c33; padding: 8px 16px; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  header .brand { font-size: 17px; margin-inline-end: 14px; }
+  nav button { background: none; border: none; color: #8696a0; font-size: 15px; font-weight: 600; padding: 8px 14px; cursor: pointer; border-radius: 8px; }
+  nav button.active { background: #2a3942; color: #00a884; }
   #health { font-size: 12px; font-weight: 400; margin-inline-start: auto; }
   #health.ok { color: #00a884; } #health.bad { color: #f15c6d; }
   main { flex: 1; display: flex; min-height: 0; }
-  #convos {
-    width: 320px; min-width: 260px; background: #111b21;
-    border-inline-end: 1px solid #222d34; overflow-y: auto;
-  }
-  .convo {
-    padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #1f2c33;
-  }
+  .view { display: none; flex: 1; min-height: 0; }
+  .view.active { display: flex; }
+
+  /* المحادثات */
+  #convos { width: 320px; min-width: 260px; background: #111b21; border-inline-end: 1px solid #222d34; overflow-y: auto; }
+  .convo { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #1f2c33; }
   .convo:hover, .convo.active { background: #2a3942; }
   .convo .name { font-weight: 600; display: flex; justify-content: space-between; }
-  .convo .badge {
-    background: #00a884; color: #111b21; border-radius: 10px;
-    font-size: 11px; padding: 1px 7px; font-weight: 700;
-  }
-  .convo .preview {
-    color: #8696a0; font-size: 13px; margin-top: 3px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  .convo .badge { background: #00a884; color: #111b21; border-radius: 10px; font-size: 11px; padding: 1px 7px; font-weight: 700; }
+  .convo .preview { color: #8696a0; font-size: 13px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #chatHeader { background: #202c33; padding: 10px 16px; font-weight: 600; }
+  #chatHeader { background: #202c33; padding: 10px 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  #chatHeader .bot-toggle { margin-inline-start: auto; font-size: 12px; font-weight: 400; display: flex; align-items: center; gap: 6px; color: #8696a0; }
   #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-  .msg {
-    max-width: 65%; padding: 8px 12px; border-radius: 8px;
-    font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
-  }
+  .msg { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .msg.inbound { background: #202c33; align-self: flex-start; }
   .msg.outbound { background: #005c4b; align-self: flex-end; }
   .msg .meta { font-size: 11px; color: #8696a0; margin-top: 4px; text-align: left; direction: ltr; }
   .msg .status-read { color: #53bdeb; }
-  #composer {
-    display: flex; gap: 8px; padding: 10px 16px; background: #202c33;
-  }
-  #composer input {
-    flex: 1; background: #2a3942; border: none; border-radius: 8px;
-    padding: 12px; color: #e9edef; font-size: 15px; outline: none;
-  }
-  #composer button {
-    background: #00a884; color: #111b21; border: none; border-radius: 8px;
-    padding: 0 22px; font-size: 15px; font-weight: 700; cursor: pointer;
-  }
-  #composer button:disabled { opacity: .5; cursor: default; }
-  #empty {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    color: #8696a0; font-size: 16px;
-  }
+  .msg .bot-tag { color: #f0b429; }
+  #composer { display: flex; gap: 8px; padding: 10px 16px; background: #202c33; }
+  #composer input { flex: 1; background: #2a3942; border: none; border-radius: 8px; padding: 12px; color: #e9edef; font-size: 15px; outline: none; }
+  #composer button, .btn { background: #00a884; color: #111b21; border: none; border-radius: 8px; padding: 0 22px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  #composer button:disabled, .btn:disabled { opacity: .5; cursor: default; }
+  #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #8696a0; font-size: 16px; }
+
+  /* الصفحات الإدارية */
+  .page { flex: 1; overflow-y: auto; padding: 24px; }
+  .page h2 { margin-bottom: 16px; font-size: 20px; }
+  .card { background: #111b21; border: 1px solid #222d34; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h3 { font-size: 15px; margin-bottom: 12px; color: #00a884; }
+  label { display: block; font-size: 13px; color: #8696a0; margin: 10px 0 4px; }
+  input[type=text], select, textarea { width: 100%; background: #2a3942; border: 1px solid #3b4a54; border-radius: 8px; padding: 10px; color: #e9edef; font-size: 14px; outline: none; font-family: inherit; }
+  textarea { resize: vertical; min-height: 80px; }
+  .btn { padding: 10px 22px; margin-top: 12px; }
+  .btn.secondary { background: #2a3942; color: #e9edef; }
+  .btn.danger { background: #f15c6d; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #222d34; }
+  th { color: #8696a0; font-weight: 600; font-size: 12.5px; }
+  .pill { border-radius: 10px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .pill.APPROVED, .pill.read { background: #00a88422; color: #00a884; }
+  .pill.PENDING, .pill.sent, .pill.pending { background: #f0b42922; color: #f0b429; }
+  .pill.REJECTED, .pill.failed { background: #f15c6d22; color: #f15c6d; }
+  .pill.delivered { background: #53bdeb22; color: #53bdeb; }
+  .pill.running { background: #53bdeb22; color: #53bdeb; }
+  .pill.done { background: #00a88422; color: #00a884; }
+  .pill.draft { background: #8696a022; color: #8696a0; }
+  .err { background: #f15c6d22; color: #f15c6d; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; display: none; }
+  .hint { color: #8696a0; font-size: 12.5px; margin-top: 6px; }
+  .switch-row { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+  progress { width: 140px; height: 8px; }
   @media (max-width: 700px) { #convos { width: 100%; } #chat { display: none; } }
 </style>
 </head>
 <body>
 <header>
-  💬 صندوق وارد واتساب
+  <span class="brand">💬 منصة واتساب</span>
+  <nav>
+    <button data-view="inbox" class="active">المحادثات</button>
+    <button data-view="templates">القوالب</button>
+    <button data-view="campaigns">الحملات</button>
+    <button data-view="bot">البوت</button>
+  </nav>
   <span id="health">...</span>
 </header>
-<main>
+
+<!-- المحادثات -->
+<div class="view active" id="view-inbox">
   <div id="convos"></div>
   <div id="chat">
     <div id="empty">اختر محادثة من القائمة</div>
-    <div id="chatHeader" hidden></div>
+    <div id="chatHeader" hidden>
+      <span id="chatTitle"></span>
+      <label class="bot-toggle">🤖 البوت <input type="checkbox" id="convBotToggle" /></label>
+    </div>
     <div id="messages" hidden></div>
     <form id="composer" hidden>
-      <input id="replyInput" placeholder="اكتب رسالة..." autocomplete="off" />
+      <input id="replyInput" placeholder="اكتب رسالة... (الرد اليدوي يوقف البوت عن هذه المحادثة)" autocomplete="off" />
       <button type="submit">إرسال</button>
     </form>
   </div>
-</main>
-<script>
-let currentWaId = null;
-const convosEl = document.getElementById('convos');
-const messagesEl = document.getElementById('messages');
-const chatHeader = document.getElementById('chatHeader');
-const composer = document.getElementById('composer');
-const replyInput = document.getElementById('replyInput');
-const emptyEl = document.getElementById('empty');
+</div>
 
+<!-- القوالب -->
+<div class="view" id="view-templates">
+  <div class="page">
+    <h2>قوالب الرسائل</h2>
+    <div class="err" id="tplErr"></div>
+    <div class="card">
+      <h3>إنشاء قالب جديد</h3>
+      <label>الاسم (إنجليزي صغير بدون مسافات، مثل welcome_offer)</label>
+      <input type="text" id="tplName" dir="ltr" />
+      <label>الفئة</label>
+      <select id="tplCategory">
+        <option value="MARKETING">تسويق (MARKETING)</option>
+        <option value="UTILITY">خدمة (UTILITY)</option>
+        <option value="AUTHENTICATION">توثيق (AUTHENTICATION)</option>
+      </select>
+      <label>اللغة</label>
+      <select id="tplLanguage">
+        <option value="ar">العربية (ar)</option>
+        <option value="en_US">الإنجليزية (en_US)</option>
+      </select>
+      <label>نص الرسالة</label>
+      <textarea id="tplBody" placeholder="مثال: مرحبًا! عرض خاص لك هذا الأسبوع..."></textarea>
+      <button class="btn" id="tplCreate">تقديم القالب للمراجعة</button>
+      <div class="hint">ميتا تراجع القالب قبل اعتماده (عادة من دقائق لساعات). الحملات ترسل بالقوالب المعتمدة فقط.</div>
+    </div>
+    <div class="card">
+      <h3>القوالب الحالية <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadTemplates()">تحديث</button></h3>
+      <table id="tplTable"><thead><tr><th>الاسم</th><th>الفئة</th><th>اللغة</th><th>الحالة</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- الحملات -->
+<div class="view" id="view-campaigns">
+  <div class="page">
+    <h2>الحملات الجماعية</h2>
+    <div class="err" id="campErr"></div>
+    <div class="card">
+      <h3>حملة جديدة</h3>
+      <label>اسم الحملة</label>
+      <input type="text" id="campName" />
+      <label>القالب المعتمد</label>
+      <select id="campTemplate"><option value="">— حمّل القوالب أولًا —</option></select>
+      <label>الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)</label>
+      <textarea id="campNumbers" dir="ltr" rows="5"></textarea>
+      <button class="btn" id="campCreate">إنشاء وبدء الإرسال</button>
+      <div class="hint">الإرسال برسالة كل ثانية تقريبًا. القالب يرسل كما هو لكل رقم؛ تجنّب الإزعاج عشان رقمك ما يتبلّغش.</div>
+    </div>
+    <div class="card">
+      <h3>الحملات <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadCampaigns()">تحديث</button></h3>
+      <table id="campTable"><thead><tr><th>الاسم</th><th>القالب</th><th>الإجمالي</th><th>ناجح</th><th>فاشل</th><th>الحالة</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card" id="campDetail" hidden>
+      <h3 id="campDetailTitle"></h3>
+      <table id="campRecTable"><thead><tr><th>الرقم</th><th>الحالة</th><th>ملاحظة</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- البوت -->
+<div class="view" id="view-bot">
+  <div class="page">
+    <h2>الرد الآلي (البوت)</h2>
+    <div class="err" id="botErr"></div>
+    <div class="card switch-row">
+      <input type="checkbox" id="botGlobal" />
+      <span>البوت مفعّل على كل المحادثات</span>
+    </div>
+    <div class="card">
+      <h3>إضافة قاعدة</h3>
+      <label>لو الرسالة تحتوي على (اكتب * للرد على أي رسالة)</label>
+      <input type="text" id="ruleKeyword" placeholder="مثال: السعر" />
+      <label>يرد بـ</label>
+      <textarea id="ruleResponse" placeholder="مثال: أسعارنا تبدأ من..."></textarea>
+      <button class="btn" id="ruleAdd">إضافة القاعدة</button>
+      <div class="hint">أول قاعدة تطابق هي اللي بتتنفذ. الرد اليدوي من صندوق الوارد يوقف البوت عن المحادثة دي تلقائيًا حتى تعيد تفعيله من رأس المحادثة.</div>
+    </div>
+    <div class="card">
+      <h3>القواعد الحالية</h3>
+      <table id="rulesTable"><thead><tr><th>الكلمة المفتاحية</th><th>الرد</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const api = async (url, opts) => {
+  const res = await fetch(url, opts ? { method: opts.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined } : undefined);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || res.status), { data });
+  return data;
+};
 const fmtTime = (ms) => new Date(ms).toLocaleString('ar', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+
+// التبويبات
+document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
+  document.querySelectorAll('nav button').forEach((x) => x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active');
+  $('view-' + b.dataset.view).classList.add('active');
+  if (b.dataset.view === 'templates') loadTemplates();
+  if (b.dataset.view === 'campaigns') { loadCampaigns(); loadApprovedTemplates(); }
+  if (b.dataset.view === 'bot') loadBot();
+}));
+
+async function loadHealth() {
+  try {
+    const h = await api('/api/health');
+    $('health').textContent = h.configured ? 'متصل بميتا' : 'بيانات ميتا ناقصة';
+    $('health').className = h.configured ? 'ok' : 'bad';
+  } catch {}
+}
+
+// ===== المحادثات =====
+let currentWaId = null;
 const statusMark = (m) => {
   if (m.direction !== 'outbound') return '';
   const marks = { sent: '✓', delivered: '✓✓', read: '✓✓', failed: '✗' };
@@ -100,68 +220,176 @@ const statusMark = (m) => {
   return ` <span class="${cls}">${marks[m.status] || ''}</span>`;
 };
 
-async function loadHealth() {
-  try {
-    const h = await (await fetch('/api/health')).json();
-    const el = document.getElementById('health');
-    el.textContent = h.configured ? 'متصل' : 'الإعدادات ناقصة (راجع .env)';
-    el.className = h.configured ? 'ok' : 'bad';
-  } catch {}
-}
-
 async function loadConvos() {
-  const { conversations } = await (await fetch('/api/conversations')).json();
-  convosEl.innerHTML = '';
+  const { conversations } = await api('/api/conversations');
+  $('convos').innerHTML = '';
   for (const c of conversations) {
     const div = document.createElement('div');
     div.className = 'convo' + (c.wa_id === currentWaId ? ' active' : '');
     div.innerHTML = `
       <div class="name"><span>${c.name || c.wa_id}</span>${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
       <div class="preview">${c.last_message || ''}</div>`;
-    div.onclick = () => openConvo(c.wa_id, c.name);
-    convosEl.appendChild(div);
+    div.onclick = () => openConvo(c);
+    $('convos').appendChild(div);
   }
 }
 
-async function openConvo(waId, name) {
-  currentWaId = waId;
-  emptyEl.hidden = true;
-  chatHeader.hidden = messagesEl.hidden = composer.hidden = false;
-  chatHeader.textContent = (name || waId) + ' — ' + waId;
+async function openConvo(c) {
+  currentWaId = c.wa_id;
+  $('empty').hidden = true;
+  $('chatHeader').hidden = $('messages').hidden = $('composer').hidden = false;
+  $('chatTitle').textContent = (c.name || c.wa_id) + ' — ' + c.wa_id;
+  $('convBotToggle').checked = Boolean(c.bot_enabled);
   await loadMessages();
   loadConvos();
 }
+
+$('convBotToggle').onchange = async (e) => {
+  if (!currentWaId) return;
+  await api(`/api/conversations/${currentWaId}/bot`, { body: { enabled: e.target.checked } });
+};
 
 async function loadMessages() {
   if (!currentWaId) return;
-  const { messages } = await (await fetch(`/api/conversations/${currentWaId}/messages`)).json();
-  messagesEl.innerHTML = '';
+  const { messages } = await api(`/api/conversations/${currentWaId}/messages`);
+  $('messages').innerHTML = '';
   for (const m of messages) {
     const div = document.createElement('div');
     div.className = `msg ${m.direction}`;
-    div.innerHTML = `${m.body || `[${m.type}]`}<div class="meta">${fmtTime(m.created_at)}${statusMark(m)}</div>`;
-    messagesEl.appendChild(div);
+    div.innerHTML = `${m.body || `[${m.type}]`}<div class="meta">${m.bot ? '<span class="bot-tag">🤖 بوت</span> ' : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    $('messages').appendChild(div);
   }
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  $('messages').scrollTop = $('messages').scrollHeight;
 }
 
-composer.onsubmit = async (e) => {
+$('composer').onsubmit = async (e) => {
   e.preventDefault();
-  const body = replyInput.value.trim();
+  const body = $('replyInput').value.trim();
   if (!body || !currentWaId) return;
-  replyInput.value = '';
-  const res = await fetch(`/api/conversations/${currentWaId}/reply`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    alert('فشل الإرسال: ' + (err.error || res.status));
-  }
+  $('replyInput').value = '';
+  try {
+    await api(`/api/conversations/${currentWaId}/reply`, { body: { body } });
+  } catch (err) { alert('فشل الإرسال: ' + err.message); }
   await loadMessages();
   loadConvos();
 };
+
+// ===== القوالب =====
+async function loadTemplates() {
+  $('tplErr').style.display = 'none';
+  try {
+    const { templates } = await api('/api/templates');
+    const tb = document.querySelector('#tplTable tbody');
+    tb.innerHTML = '';
+    for (const t of templates) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td>${t.language}</td><td><span class="pill ${t.status}">${t.status}</span></td>`;
+      tb.appendChild(tr);
+    }
+    if (!templates.length) tb.innerHTML = '<tr><td colspan="4" style="color:#8696a0">لا توجد قوالب بعد</td></tr>';
+  } catch (err) {
+    $('tplErr').textContent = err.message;
+    $('tplErr').style.display = 'block';
+  }
+}
+
+$('tplCreate').onclick = async () => {
+  $('tplErr').style.display = 'none';
+  try {
+    await api('/api/templates', { body: { name: $('tplName').value.trim(), category: $('tplCategory').value, language: $('tplLanguage').value, body: $('tplBody').value } });
+    $('tplName').value = $('tplBody').value = '';
+    loadTemplates();
+    alert('تم تقديم القالب لمراجعة ميتا');
+  } catch (err) {
+    $('tplErr').textContent = err.message;
+    $('tplErr').style.display = 'block';
+  }
+};
+
+// ===== الحملات =====
+async function loadApprovedTemplates() {
+  try {
+    const { templates } = await api('/api/templates');
+    const sel = $('campTemplate');
+    sel.innerHTML = '';
+    const approved = templates.filter((t) => t.status === 'APPROVED');
+    if (!approved.length) sel.innerHTML = '<option value="">لا توجد قوالب معتمدة بعد</option>';
+    for (const t of approved) sel.innerHTML += `<option value="${t.name}" data-lang="${t.language}">${t.name} (${t.language})</option>`;
+  } catch {}
+}
+
+async function loadCampaigns() {
+  const { campaigns } = await api('/api/campaigns');
+  const tb = document.querySelector('#campTable tbody');
+  tb.innerHTML = '';
+  for (const c of campaigns) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${c.status}</span></td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">التفاصيل</button></td>`;
+    tb.appendChild(tr);
+  }
+  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="7" style="color:#8696a0">لا توجد حملات بعد</td></tr>';
+}
+
+async function showCampaign(id, name) {
+  const { recipients } = await api(`/api/campaigns/${id}`);
+  $('campDetail').hidden = false;
+  $('campDetailTitle').textContent = 'مستلمو حملة: ' + name;
+  const tb = document.querySelector('#campRecTable tbody');
+  tb.innerHTML = '';
+  for (const r of recipients) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td dir="ltr">${r.wa_id}</td><td><span class="pill ${r.status}">${r.status}</span></td><td style="font-size:12px;color:#8696a0">${r.error || ''}</td>`;
+    tb.appendChild(tr);
+  }
+}
+window.showCampaign = showCampaign;
+
+$('campCreate').onclick = async () => {
+  $('campErr').style.display = 'none';
+  const sel = $('campTemplate');
+  try {
+    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value } });
+    await api(`/api/campaigns/${r.id}/start`, { body: {} });
+    $('campName').value = $('campNumbers').value = '';
+    loadCampaigns();
+    setTimeout(loadCampaigns, 5000);
+    alert(`بدأت الحملة لـ ${r.total} رقم`);
+  } catch (err) {
+    $('campErr').textContent = err.message;
+    $('campErr').style.display = 'block';
+  }
+};
+
+// ===== البوت =====
+async function loadBot() {
+  const { enabled, rules } = await api('/api/bot');
+  $('botGlobal').checked = enabled;
+  const tb = document.querySelector('#rulesTable tbody');
+  tb.innerHTML = '';
+  for (const r of rules) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.keyword}</td><td>${r.response}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">حذف</button></td>`;
+    tb.appendChild(tr);
+  }
+  if (!rules.length) tb.innerHTML = '<tr><td colspan="3" style="color:#8696a0">لا توجد قواعد بعد</td></tr>';
+}
+
+$('botGlobal').onchange = async (e) => { await api('/api/bot/toggle', { body: { enabled: e.target.checked } }); };
+
+$('ruleAdd').onclick = async () => {
+  $('botErr').style.display = 'none';
+  try {
+    await api('/api/bot/rules', { body: { keyword: $('ruleKeyword').value, response: $('ruleResponse').value } });
+    $('ruleKeyword').value = $('ruleResponse').value = '';
+    loadBot();
+  } catch (err) {
+    $('botErr').textContent = err.message;
+    $('botErr').style.display = 'block';
+  }
+};
+
+async function delRule(id) { await api(`/api/bot/rules/${id}`, { method: 'DELETE' }); loadBot(); }
+window.delRule = delRule;
 
 loadHealth();
 loadConvos();
