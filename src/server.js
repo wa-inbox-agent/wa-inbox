@@ -121,7 +121,7 @@ const AUTH_SECRET = process.env.AUTH_SECRET || randomBytes(32).toString('hex');
 // ---------- ترخيص النسخة المدفوعة ----------
 
 const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA8ayBIfe6EiNUCoHit+6NCXJvfAcP/+XAMbXprjFjEmk=
+MCowBQYDK2VwAyEATXKZjWQNCc84jHGRdR2uOYBw1pBPgkkihq7tHwzW7jE=
 -----END PUBLIC KEY-----`;
 
 if (!getSetting('instance_id')) setSetting('instance_id', randomBytes(4).toString('hex'));
