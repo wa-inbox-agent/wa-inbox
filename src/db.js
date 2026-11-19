@@ -116,6 +116,11 @@ try { db.exec(`ALTER TABLE conversations ADD COLUMN last_after_hours_at INTEGER`
 
 const now = () => Date.now();
 
+// لقطة متسقة من قاعدة البيانات للنسخ الاحتياطي
+export function snapshotTo(outPath) {
+  db.exec(`VACUUM INTO '${outPath}'`);
+}
+
 export function upsertInbound({ waId, name, waMessageId, type, body, ts, mediaId = null, mimeType = null, filename = null }) {
   const t = ts ?? now();
   db.prepare(
