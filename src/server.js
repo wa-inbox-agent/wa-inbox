@@ -68,6 +68,10 @@ import {
   setAgentDept,
   transferConversation,
   addCsatRating,
+  setConversationArchived,
+  autoAssignRoundRobin,
+  agentStats,
+  dailyAdminSummary,
   logWebhookEvent,
   recentWebhookEvents,
   resetFailedRecipients,
@@ -377,6 +381,7 @@ app.post('/webhook', (req, res) => {
                 quotedWaId: msg.context?.id ?? null,
               });
               upsertContact({ phone: msg.from, name: contact?.profile?.name ?? null });
+              if (isNewConversation) autoAssignRoundRobin(msg.from, phoneNumberId);
               const inboundText = msg.text?.body?.trim() ?? '';
               if (msg.type === 'text' && /^(إيقاف|ايقاف|اوقف|stop|unsubscribe|إلغاء|الغاء)$/i.test(inboundText)) {
                 setContactOptOut(msg.from, true);
@@ -403,7 +408,23 @@ app.post('/webhook', (req, res) => {
 // ---------- صندوق الوارد ----------
 
 app.get('/api/conversations', (req, res) => {
-  res.json({ conversations: listConversations(req.agent) });
+  res.json({ conversations: listConversations(req.agent, req.query.archived === '1') });
+});
+
+// أرشفة محادثة (أرشيف بدل الحذف)
+app.post('/api/conversations/:waId/archive', (req, res) => {
+  setConversationArchived(req.params.waId, Boolean(req.body?.archived), req.body?.pn ?? null);
+  res.json({ ok: true });
+});
+
+// أداء الموظفين (للمدير)
+app.get('/api/agents/stats', requireAdmin, (req, res) => {
+  res.json({ stats: agentStats() });
+});
+
+// ملخص اليوم للمدير
+app.get('/api/admin/daily-summary', requireAdmin, (req, res) => {
+  res.json(dailyAdminSummary());
 });
 
 // ---------- أرقام الواتساب المتصلة (الأقسام) ----------

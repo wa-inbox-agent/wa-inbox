@@ -143,6 +143,8 @@ try { db.exec(`ALTER TABLE bot_rules ADD COLUMN phone_number_id TEXT`); } catch 
 try { db.exec(`ALTER TABLE messages ADD COLUMN quoted_wa_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE conversations ADD COLUMN labels TEXT DEFAULT ''`); } catch {}
 try { db.exec(`ALTER TABLE agents ADD COLUMN phone_number_id TEXT`); } catch {}
+try { db.exec(`ALTER TABLE agents ADD COLUMN last_assigned_at INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN archived INTEGER DEFAULT 0`); } catch {}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS csat_ratings (
@@ -307,38 +309,100 @@ export function updateStatus(waMessageId, status) {
   ).run(status, now(), waMessageId);
 }
 
-export function listConversations(agent = null) {
+export function listConversations(agent = null, archivedOnly = false) {
+  const archWhere = archivedOnly ? 'c.archived = 1' : 'COALESCE(c.archived, 0) = 0';
+  const select = `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
+       LEFT JOIN agents a ON a.id = c.assigned_to
+       LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id`;
   if (agent && agent.role !== 'admin') {
     if (agent.phone_number_id) {
       // موظف مربوط بقسم: يرى محادثات قسمه فقط
-      return db
-        .prepare(
-          `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
-           LEFT JOIN agents a ON a.id = c.assigned_to
-           LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id
-           WHERE c.phone_number_id = ?
-           ORDER BY c.last_message_at DESC`
-        )
-        .all(agent.phone_number_id);
+      return db.prepare(`${select} WHERE c.phone_number_id = ? AND ${archWhere} ORDER BY c.last_message_at DESC`).all(agent.phone_number_id);
     }
-    return db
-      .prepare(
-        `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
-         LEFT JOIN agents a ON a.id = c.assigned_to
-         LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id
-         WHERE c.assigned_to IS NULL OR c.assigned_to = ?
-         ORDER BY c.last_message_at DESC`
-      )
-      .all(agent.id);
+    return db.prepare(`${select} WHERE (c.assigned_to IS NULL OR c.assigned_to = ?) AND ${archWhere} ORDER BY c.last_message_at DESC`).all(agent.id);
   }
-  return db
-    .prepare(
-      `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
-       LEFT JOIN agents a ON a.id = c.assigned_to
-       LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id
-       ORDER BY c.last_message_at DESC`
-    )
+  return db.prepare(`${select} WHERE ${archWhere} ORDER BY c.last_message_at DESC`).all();
+}
+
+export function setConversationArchived(waId, archived, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET archived = ? WHERE wa_id = ? AND phone_number_id = ?`).run(archived ? 1 : 0, waId, pn);
+}
+
+// إسناد تلقائي بالتناوب (round-robin) لموظفي القسم عند أول رسالة في محادثة جديدة
+export function autoAssignRoundRobin(waId, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  const agent = db
+    .prepare(`SELECT id, name FROM agents WHERE active = 1 AND role != 'admin' AND phone_number_id = ? ORDER BY COALESCE(last_assigned_at, 0) ASC, id ASC LIMIT 1`)
+    .get(pn);
+  if (!agent) return null;
+  db.prepare(`UPDATE conversations SET assigned_to = ? WHERE wa_id = ? AND phone_number_id = ?`).run(agent.id, waId, pn);
+  db.prepare(`UPDATE agents SET last_assigned_at = ? WHERE id = ?`).run(now(), agent.id);
+  return agent;
+}
+
+// أداء الموظفين: عدد الردود اليدوية + متوسط زمن أول رد على المحادثة
+export function agentStats() {
+  const manual = db
+    .prepare(`SELECT wa_id, phone_number_id, sender, created_at FROM messages WHERE direction = 'outbound' AND bot = 0 AND sender IS NOT NULL AND sender NOT IN ('إرسال سريع', 'API', 'النظام') ORDER BY created_at ASC`)
     .all();
+  const firstInbound = new Map();
+  for (const r of db.prepare(`SELECT wa_id, phone_number_id, MIN(created_at) AS first_in FROM messages WHERE direction = 'inbound' GROUP BY wa_id, phone_number_id`).all()) {
+    firstInbound.set(r.wa_id + '|' + r.phone_number_id, r.first_in);
+  }
+  const stats = new Map(); // sender -> { replies, firstReplies: number, totalFirstMs }
+  const seenConvo = new Set();
+  for (const m of manual) {
+    const key = m.wa_id + '|' + m.phone_number_id;
+    const st = stats.get(m.sender) ?? { replies: 0, firstCount: 0, totalFirstMs: 0 };
+    st.replies += 1;
+    if (!seenConvo.has(key)) {
+      seenConvo.add(key);
+      const fi = firstInbound.get(key);
+      if (fi && m.created_at >= fi) {
+        st.firstCount += 1;
+        st.totalFirstMs += m.created_at - fi;
+      }
+    }
+    stats.set(m.sender, st);
+  }
+  return listAgents()
+    .filter((a) => a.role !== 'admin')
+    .map((a) => {
+      const st = stats.get(a.name) ?? { replies: 0, firstCount: 0, totalFirstMs: 0 };
+      return {
+        id: a.id,
+        name: a.name,
+        username: a.username,
+        active: a.active,
+        dept: a.phone_number_id,
+        replies: st.replies,
+        first_replies: st.firstCount,
+        avg_first_response_min: st.firstCount ? Math.round(st.totalFirstMs / st.firstCount / 60000) : null,
+      };
+    });
+}
+
+// ملخص اليوم للمدير
+export function dailyAdminSummary() {
+  const dayMs = 24 * 3600 * 1000;
+  const nowT = now();
+  const startOfDay = nowT - ((nowT + 3 * 3600 * 1000) % dayMs);
+  const g = (sql, ...args) => db.prepare(sql).get(...args)?.n ?? 0;
+  return {
+    inbound_today: g(`SELECT COUNT(*) AS n FROM messages WHERE direction='inbound' AND created_at >= ?`, startOfDay),
+    outbound_today: g(`SELECT COUNT(*) AS n FROM messages WHERE direction='outbound' AND bot=0 AND created_at >= ?`, startOfDay),
+    bot_today: g(`SELECT COUNT(*) AS n FROM messages WHERE direction='outbound' AND bot=1 AND created_at >= ?`, startOfDay),
+    new_convos_today: g(`SELECT COUNT(*) AS n FROM (SELECT wa_id, phone_number_id, MIN(created_at) AS f FROM messages GROUP BY wa_id, phone_number_id HAVING f >= ?)`, startOfDay),
+    open_convos: g(`SELECT COUNT(*) AS n FROM conversations WHERE status='open' AND COALESCE(archived,0)=0`),
+    archived: g(`SELECT COUNT(*) AS n FROM conversations WHERE archived=1`),
+    unread: g(`SELECT COALESCE(SUM(unread),0) AS n FROM conversations WHERE COALESCE(archived,0)=0`),
+    csat_today: g(`SELECT COUNT(*) AS n FROM csat_ratings WHERE created_at >= ?`, startOfDay),
+    csat_avg_today: db.prepare(`SELECT ROUND(AVG(rating),1) AS a FROM csat_ratings WHERE created_at >= ?`).get(startOfDay)?.a ?? null,
+    team_replies_today: db
+      .prepare(`SELECT sender, COUNT(*) AS n FROM messages WHERE direction='outbound' AND bot=0 AND sender IS NOT NULL AND sender NOT IN ('إرسال سريع','API','النظام') AND created_at >= ? GROUP BY sender ORDER BY n DESC`)
+      .all(startOfDay),
+  };
 }
 
 export function setConversationLabels(waId, labels, phoneNumberId = null) {
