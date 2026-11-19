@@ -23,6 +23,13 @@ import {
   markRecipient,
   dueCampaigns,
   getMessage,
+  assignConversation,
+  createAgent,
+  listAgents,
+  getAgentByUsername,
+  getAgent,
+  setAgentActive,
+  agentsCount,
   upsertContact,
   listContacts,
   setContactOptOut,
@@ -32,6 +39,7 @@ import {
 } from './db.js';
 import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -54,6 +62,118 @@ const wrap = (fn) => async (req, res) => {
     res.status(502).json({ error: err.message, meta: err.meta ?? null });
   }
 };
+
+// ---------- المصادقة وتعدد الموظفين ----------
+
+const AUTH_SECRET = process.env.AUTH_SECRET || randomBytes(32).toString('hex');
+const COOKIE = 'wa_session';
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 32).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  try {
+    const [salt, hash] = String(stored).split(':');
+    const candidate = scryptSync(password, salt, 32);
+    return timingSafeEqual(candidate, Buffer.from(hash, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+function signSession(agentId) {
+  const exp = Date.now() + 7 * 24 * 3600 * 1000;
+  const payload = `${agentId}.${exp}`;
+  const sig = createHmac('sha256', AUTH_SECRET).update(payload).digest('hex');
+  return `${payload}.${sig}`;
+}
+
+function readSession(req) {
+  const raw = req.headers.cookie?.split(/; */).find((c) => c.startsWith(COOKIE + '='));
+  if (!raw) return null;
+  const parts = decodeURIComponent(raw.slice(COOKIE.length + 1)).split('.');
+  if (parts.length !== 3) return null;
+  const [id, exp, sig] = parts;
+  const expected = createHmac('sha256', AUTH_SECRET).update(`${id}.${exp}`).digest('hex');
+  if (sig !== expected || Number(exp) < Date.now()) return null;
+  const agent = getAgent(Number(id));
+  return agent && agent.active ? agent : null;
+}
+
+// ملاحظة: داخل app.use('/api') يكون req.path بدون البادئة /api
+const PUBLIC_API = new Set(['/health', '/auth/login']);
+app.use('/api', (req, res, next) => {
+  if (PUBLIC_API.has(req.path) || req.path.startsWith('/outbound')) return next();
+  const agent = readSession(req);
+  if (!agent) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
+  req.agent = agent;
+  next();
+});
+
+function requireAdmin(req, res, next) {
+  if (req.agent?.role !== 'admin') return res.status(403).json({ error: 'صلاحية المدير مطلوبة' });
+  next();
+}
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body ?? {};
+  const agent = getAgentByUsername(String(username ?? '').trim());
+  if (!agent || !agent.active || !verifyPassword(String(password ?? ''), agent.pass_hash)) {
+    return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
+  }
+  res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(signSession(agent.id))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
+  res.json({ ok: true, agent: { id: agent.id, username: agent.username, name: agent.name, role: agent.role } });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; Max-Age=0`);
+  res.json({ ok: true });
+});
+
+app.get('/api/me', (req, res) => {
+  res.json({ agent: req.agent });
+});
+
+app.get('/api/agents', requireAdmin, (req, res) => {
+  res.json({ agents: listAgents() });
+});
+
+app.post('/api/agents', requireAdmin, (req, res) => {
+  const { username, name, password, role } = req.body ?? {};
+  if (!username?.trim() || !name?.trim() || !password || String(password).length < 6) {
+    return res.status(400).json({ error: 'اسم المستخدم والاسم وكلمة سر من 6 أحرف على الأقل مطلوبة' });
+  }
+  if (getAgentByUsername(username.trim())) return res.status(409).json({ error: 'اسم المستخدم مستخدم بالفعل' });
+  const id = createAgent({ username: username.trim(), name: name.trim(), passHash: hashPassword(String(password)), role: role === 'admin' ? 'admin' : 'agent' });
+  res.json({ ok: true, id });
+});
+
+app.post('/api/agents/:id/toggle', requireAdmin, (req, res) => {
+  setAgentActive(Number(req.params.id), Boolean(req.body?.active));
+  res.json({ ok: true });
+});
+
+// إسناد محادثة لموظف (أو فك الإسناد بـ null)
+app.post('/api/conversations/:waId/assign', (req, res) => {
+  const agentId = req.body?.agent_id ? Number(req.body.agent_id) : null;
+  if (agentId && !getAgent(agentId)) return res.status(404).json({ error: 'الموظف غير موجود' });
+  assignConversation(req.params.waId, agentId);
+  res.json({ ok: true });
+});
+
+// إنشاء حساب المدير الأول من متغيرات البيئة عند أول تشغيل
+if (agentsCount() === 0 && process.env.ADMIN_USER && process.env.ADMIN_PASSWORD) {
+  createAgent({
+    username: process.env.ADMIN_USER,
+    name: process.env.ADMIN_NAME || 'المدير',
+    passHash: hashPassword(process.env.ADMIN_PASSWORD),
+    role: 'admin',
+  });
+  console.log(`تم إنشاء حساب المدير: ${process.env.ADMIN_USER}`);
+}
 
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
 async function maybeBotReply(msg) {
@@ -131,7 +251,7 @@ app.post('/webhook', (req, res) => {
 // ---------- صندوق الوارد ----------
 
 app.get('/api/conversations', (req, res) => {
-  res.json({ conversations: listConversations() });
+  res.json({ conversations: listConversations(req.agent) });
 });
 
 app.get('/api/conversations/:waId/messages', (req, res) => {
@@ -149,10 +269,10 @@ app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
   if (mediaUrl) {
     if (!/^https:\/\//.test(mediaUrl)) return res.status(400).json({ error: 'رابط الميديا لازم يبدأ بـ https://' });
     result = await sendMedia(waId, mediaType, mediaUrl, body || null);
-    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl });
+    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl, sender: req.agent?.name ?? null });
   } else {
     result = await sendText(waId, body);
-    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body });
+    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body, sender: req.agent?.name ?? null });
   }
   // تدخل بشري: نوقف البوت عن هذه المحادثة حتى يعاد تفعيله يدويًا
   setConversationBot(waId, false);

@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS agents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  pass_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'agent',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS contacts (
   phone TEXT PRIMARY KEY,
   name TEXT,
@@ -84,6 +94,8 @@ try { db.exec(`ALTER TABLE messages ADD COLUMN mime_type TEXT`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN filename TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN header_link TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN header_type TEXT`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN assigned_to INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN sender TEXT`); } catch {}
 
 const now = () => Date.now();
 
@@ -105,12 +117,12 @@ export function upsertInbound({ waId, name, waMessageId, type, body, ts, mediaId
   ).run(waId, name ?? null, body ?? `[${type}]`, t);
 }
 
-export function insertOutbound({ waId, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null }) {
+export function insertOutbound({ waId, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null, sender = null }) {
   const t = now();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, created_at)
-     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?)`
-  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, t);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, sender, created_at)
+     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, sender, t);
 
   db.prepare(
     `INSERT INTO conversations (wa_id, last_message, last_message_at, unread)
@@ -129,8 +141,57 @@ export function updateStatus(waMessageId, status) {
   ).run(status, now(), waMessageId);
 }
 
-export function listConversations() {
-  return db.prepare(`SELECT * FROM conversations ORDER BY last_message_at DESC`).all();
+export function listConversations(agent = null) {
+  if (agent && agent.role !== 'admin') {
+    return db
+      .prepare(
+        `SELECT c.*, a.name AS assigned_name FROM conversations c
+         LEFT JOIN agents a ON a.id = c.assigned_to
+         WHERE c.assigned_to IS NULL OR c.assigned_to = ?
+         ORDER BY c.last_message_at DESC`
+      )
+      .all(agent.id);
+  }
+  return db
+    .prepare(
+      `SELECT c.*, a.name AS assigned_name FROM conversations c
+       LEFT JOIN agents a ON a.id = c.assigned_to
+       ORDER BY c.last_message_at DESC`
+    )
+    .all();
+}
+
+export function assignConversation(waId, agentId) {
+  db.prepare(`UPDATE conversations SET assigned_to = ? WHERE wa_id = ?`).run(agentId, waId);
+}
+
+// ---------- الموظفون ----------
+
+export function createAgent({ username, name, passHash, role = 'agent' }) {
+  const r = db
+    .prepare(`INSERT INTO agents (username, name, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?)`)
+    .run(username, name, passHash, role, now());
+  return Number(r.lastInsertRowid);
+}
+
+export function listAgents() {
+  return db.prepare(`SELECT id, username, name, role, active, created_at FROM agents ORDER BY id ASC`).all();
+}
+
+export function getAgentByUsername(username) {
+  return db.prepare(`SELECT * FROM agents WHERE username = ?`).get(username);
+}
+
+export function getAgent(id) {
+  return db.prepare(`SELECT id, username, name, role, active FROM agents WHERE id = ?`).get(id);
+}
+
+export function setAgentActive(id, active) {
+  db.prepare(`UPDATE agents SET active = ? WHERE id = ?`).run(active ? 1 : 0, id);
+}
+
+export function agentsCount() {
+  return db.prepare(`SELECT count(*) AS n FROM agents`).get().n;
 }
 
 export function getMessage(id) {
