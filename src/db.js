@@ -229,7 +229,15 @@ export function setPhoneNumberLabel(phoneNumberId, label) {
 }
 
 export function deletePhoneNumber(phoneNumberId) {
-  db.prepare(`DELETE FROM phone_numbers WHERE phone_number_id = ? AND is_default = 0`).run(String(phoneNumberId));
+  const id = String(phoneNumberId);
+  // يمسح الرقم المسجّل وكل بياناته المرتبطة (محادثات/رسائل/قواعد بوت) عشان ميبقاش له أثر في التقارير
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM messages WHERE phone_number_id = ?`).run(id);
+    db.prepare(`DELETE FROM conversations WHERE phone_number_id = ?`).run(id);
+    db.prepare(`DELETE FROM bot_rules WHERE phone_number_id = ?`).run(id);
+    db.prepare(`DELETE FROM phone_numbers WHERE phone_number_id = ? AND is_default = 0`).run(id);
+  });
+  tx();
 }
 
 const now = () => Date.now();
