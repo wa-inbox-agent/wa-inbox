@@ -23,6 +23,15 @@ import {
   markRecipient,
   dueCampaigns,
   getMessage,
+  getBotRule,
+  getPendingMenu,
+  setPendingMenu,
+  menuText,
+  allSettings,
+  getSetting,
+  setSetting,
+  getLastAfterHours,
+  setLastAfterHours,
   assignConversation,
   createAgent,
   listAgents,
@@ -175,18 +184,64 @@ if (agentsCount() === 0 && process.env.ADMIN_USER && process.env.ADMIN_PASSWORD)
   console.log(`تم إنشاء حساب المدير: ${process.env.ADMIN_USER}`);
 }
 
+// هل نحن الآن خارج ساعات العمل؟ (بتوقيت الرياض)
+function isAfterHours() {
+  if (getSetting('after_hours_enabled') !== '1') return false;
+  const nowRiyadh = new Date(Date.now() + 3 * 3600 * 1000); // UTC+3
+  const day = nowRiyadh.getUTCDay();
+  const days = String(getSetting('work_days')).split(',').map((d) => Number(d.trim()));
+  if (!days.includes(day)) return true;
+  const hm = nowRiyadh.getUTCHours() * 60 + nowRiyadh.getUTCMinutes();
+  const [sh, sm] = String(getSetting('work_start')).split(':').map(Number);
+  const [eh, em] = String(getSetting('work_end')).split(':').map(Number);
+  return hm < sh * 60 + sm || hm >= eh * 60 + em;
+}
+
+async function sendBotText(waId, body) {
+  try {
+    const result = await sendText(waId, body);
+    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body, bot: 1 });
+  } catch (err) {
+    console.error('فشل رد البوت:', err.message);
+  }
+}
+
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
 async function maybeBotReply(msg) {
   if (msg.type !== 'text') return;
   if (!getBotSettings().enabled) return;
   if (!getConversationBot(msg.from)) return;
-  const rule = matchBotRule(msg.text?.body);
+  const text = msg.text?.body ?? '';
+
+  // خارج الدوام: رد واحد كل 12 ساعة لكل محادثة ويتجاوز باقي القواعد
+  if (isAfterHours()) {
+    if (Date.now() - getLastAfterHours(msg.from) > 12 * 3600 * 1000) {
+      await sendBotText(msg.from, getSetting('after_hours_message'));
+      setLastAfterHours(msg.from, Date.now());
+    }
+    return;
+  }
+
+  // قائمة معلّقة: رد برقم الخيار
+  const pendingId = getPendingMenu(msg.from);
+  if (pendingId) {
+    setPendingMenu(msg.from, null);
+    const rule = getBotRule(pendingId);
+    const opt = (rule?.options ?? []).find((o) => o.key === text.trim());
+    if (opt) {
+      await sendBotText(msg.from, opt.reply);
+      return;
+    }
+    // لم يختر رقمًا صحيحًا: نكمل للمطابقة العادية
+  }
+
+  const rule = matchBotRule(text);
   if (!rule) return;
-  try {
-    const result = await sendText(msg.from, rule.response);
-    insertOutbound({ waId: msg.from, waMessageId: result?.messages?.[0]?.id, body: rule.response, bot: 1 });
-  } catch (err) {
-    console.error('فشل رد البوت:', err.message);
+  if (rule.type === 'menu') {
+    await sendBotText(msg.from, menuText(rule));
+    setPendingMenu(msg.from, rule.id);
+  } else {
+    await sendBotText(msg.from, rule.response);
   }
 }
 
@@ -337,12 +392,44 @@ app.post('/api/bot/toggle', (req, res) => {
 });
 
 app.post('/api/bot/rules', (req, res) => {
-  const { keyword, response } = req.body ?? {};
+  const { keyword, response, type, options } = req.body ?? {};
   if (!keyword?.trim() || !response?.trim()) {
     return res.status(400).json({ error: 'الكلمة المفتاحية والرد مطلوبان' });
   }
-  const id = addBotRule(keyword, response);
+  let opts = null;
+  if (type === 'menu') {
+    if (!Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ error: 'القائمة تحتاج خيارين على الأقل: رقم + عنوان + رد' });
+    }
+    opts = options.map((o, i) => ({ key: String(o.key ?? i + 1).trim(), label: String(o.label ?? '').trim(), reply: String(o.reply ?? '').trim() }));
+    if (opts.some((o) => !o.key || !o.label || !o.reply)) {
+      return res.status(400).json({ error: 'كل خيار يحتاج رقم وعنوان ورد' });
+    }
+  }
+  const id = addBotRule(keyword, response, type === 'menu' ? 'menu' : 'keyword', opts);
   res.json({ ok: true, id });
+});
+
+// إعدادات الرد خارج الدوام وساعات العمل
+app.get('/api/bot/after-hours', (req, res) => {
+  const s = allSettings();
+  res.json({
+    enabled: s.after_hours_enabled === '1',
+    message: s.after_hours_message,
+    work_start: s.work_start,
+    work_end: s.work_end,
+    work_days: s.work_days,
+  });
+});
+
+app.post('/api/bot/after-hours', (req, res) => {
+  const { enabled, message, work_start, work_end, work_days } = req.body ?? {};
+  if (enabled !== undefined) setSetting('after_hours_enabled', enabled ? '1' : '0');
+  if (message !== undefined) setSetting('after_hours_message', message);
+  if (work_start !== undefined) setSetting('work_start', work_start);
+  if (work_end !== undefined) setSetting('work_end', work_end);
+  if (work_days !== undefined) setSetting('work_days', work_days);
+  res.json({ ok: true });
 });
 
 app.delete('/api/bot/rules/:id', (req, res) => {

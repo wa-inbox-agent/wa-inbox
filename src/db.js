@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS agents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
@@ -96,6 +101,10 @@ try { db.exec(`ALTER TABLE campaigns ADD COLUMN header_link TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN header_type TEXT`); } catch {}
 try { db.exec(`ALTER TABLE conversations ADD COLUMN assigned_to INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN sender TEXT`); } catch {}
+try { db.exec(`ALTER TABLE bot_rules ADD COLUMN type TEXT NOT NULL DEFAULT 'keyword'`); } catch {}
+try { db.exec(`ALTER TABLE bot_rules ADD COLUMN options TEXT`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN pending_menu INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN last_after_hours_at INTEGER`); } catch {}
 
 const now = () => Date.now();
 
@@ -217,13 +226,62 @@ export function listBotRules() {
   return db.prepare(`SELECT * FROM bot_rules ORDER BY id ASC`).all();
 }
 
-export function addBotRule(keyword, response) {
-  const r = db.prepare(`INSERT INTO bot_rules (keyword, response, created_at) VALUES (?, ?, ?)`).run(
+export function addBotRule(keyword, response, type = 'keyword', options = null) {
+  const r = db.prepare(`INSERT INTO bot_rules (keyword, response, type, options, created_at) VALUES (?, ?, ?, ?, ?)`).run(
     keyword.trim(),
     response.trim(),
+    type,
+    options ? JSON.stringify(options) : null,
     now()
   );
   return r.lastInsertRowid;
+}
+
+export function getBotRule(id) {
+  const r = db.prepare(`SELECT * FROM bot_rules WHERE id = ?`).get(id);
+  if (r?.options) r.options = JSON.parse(r.options);
+  return r;
+}
+
+export function getPendingMenu(waId) {
+  return db.prepare(`SELECT pending_menu FROM conversations WHERE wa_id = ?`).get(waId)?.pending_menu ?? null;
+}
+
+export function setPendingMenu(waId, ruleId) {
+  db.prepare(`UPDATE conversations SET pending_menu = ? WHERE wa_id = ?`).run(ruleId, waId);
+}
+
+// ---------- الإعدادات العامة (ساعات العمل، الرد خارج الدوام) ----------
+
+const DEFAULTS = {
+  after_hours_enabled: '0',
+  after_hours_message: 'شكرًا لتواصلك معنا. نحن خارج أوقات العمل حاليًا، وسنرد عليك في أقرب وقت خلال الدوام.',
+  work_start: '09:00',
+  work_end: '17:00',
+  work_days: '0,1,2,3,4',
+};
+
+export function getSetting(key) {
+  const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key);
+  return row?.value ?? DEFAULTS[key] ?? null;
+}
+
+export function setSetting(key, value) {
+  db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, String(value));
+}
+
+export function allSettings() {
+  const out = { ...DEFAULTS };
+  for (const r of db.prepare(`SELECT key, value FROM settings`).all()) out[r.key] = r.value;
+  return out;
+}
+
+export function getLastAfterHours(waId) {
+  return db.prepare(`SELECT last_after_hours_at FROM conversations WHERE wa_id = ?`).get(waId)?.last_after_hours_at ?? 0;
+}
+
+export function setLastAfterHours(waId, ts) {
+  db.prepare(`UPDATE conversations SET last_after_hours_at = ? WHERE wa_id = ?`).run(ts, waId);
 }
 
 export function deleteBotRule(id) {
@@ -238,6 +296,13 @@ export function matchBotRule(text) {
     if (lower.includes(rule.keyword.toLowerCase())) return rule;
   }
   return null;
+}
+
+// نص القائمة المرقّمة لقاعدة من نوع menu
+export function menuText(rule) {
+  const opts = typeof rule.options === 'string' ? JSON.parse(rule.options) : rule.options ?? [];
+  const lines = opts.map((o) => `${o.key}) ${o.label}`);
+  return [rule.response, ...lines].join('\n');
 }
 
 export function getConversationBot(waId) {
