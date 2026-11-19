@@ -93,11 +93,14 @@ app.post('/api/conversations/:waId/reply', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
+  const set = (v) => Boolean(v && !v.startsWith('SET_ME'));
   res.json({
     ok: true,
-    configured: Boolean(
-      process.env.PHONE_NUMBER_ID && process.env.WABA_ID && process.env.WHATSAPP_TOKEN && VERIFY_TOKEN
-    ),
+    configured:
+      set(process.env.PHONE_NUMBER_ID) &&
+      set(process.env.WABA_ID) &&
+      set(process.env.WHATSAPP_TOKEN) &&
+      set(VERIFY_TOKEN),
   });
 });
 
