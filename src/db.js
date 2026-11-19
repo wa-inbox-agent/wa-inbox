@@ -139,6 +139,7 @@ try { db.exec(`ALTER TABLE conversations ADD COLUMN last_after_hours_at INTEGER`
 try { db.exec(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT 'open'`); } catch {}
 try { db.exec(`ALTER TABLE contacts ADD COLUMN notes TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN body_params TEXT`); } catch {}
+try { db.exec(`ALTER TABLE bot_rules ADD COLUMN phone_number_id TEXT`); } catch {}
 
 // ---------- تعدد الأرقام (قسم مستقل لكل رقم واتساب) ----------
 try {
@@ -359,15 +360,16 @@ export function setBotEnabled(enabled) {
 }
 
 export function listBotRules() {
-  return db.prepare(`SELECT * FROM bot_rules ORDER BY id ASC`).all();
+  return db.prepare(`SELECT b.*, pn.label AS dept_label FROM bot_rules b LEFT JOIN phone_numbers pn ON pn.phone_number_id = b.phone_number_id ORDER BY b.id ASC`).all();
 }
 
-export function addBotRule(keyword, response, type = 'keyword', options = null) {
-  const r = db.prepare(`INSERT INTO bot_rules (keyword, response, type, options, created_at) VALUES (?, ?, ?, ?, ?)`).run(
+export function addBotRule(keyword, response, type = 'keyword', options = null, phoneNumberId = null) {
+  const r = db.prepare(`INSERT INTO bot_rules (keyword, response, type, options, phone_number_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
     keyword.trim(),
     response.trim(),
     type,
     options ? JSON.stringify(options) : null,
+    phoneNumberId || null,
     now()
   );
   return r.lastInsertRowid;
@@ -430,10 +432,13 @@ export function deleteBotRule(id) {
   db.prepare(`DELETE FROM bot_rules WHERE id = ?`).run(id);
 }
 
-// إيجاد أول قاعدة تطابق نص الرسالة؛ القاعدة ذات الكلمة المفتاحية * تطابق أي رسالة
-export function matchBotRule(text) {
+// إيجاد أول قاعدة تطابق نص الرسالة؛ قواعد القسم أولًا ثم العامة. * تطابق أي رسالة
+export function matchBotRule(text, phoneNumberId = null) {
   const lower = String(text ?? '').toLowerCase();
-  for (const rule of listBotRules()) {
+  const rules = listBotRules();
+  const scoped = rules.filter((r) => r.phone_number_id && r.phone_number_id === phoneNumberId);
+  const global = rules.filter((r) => !r.phone_number_id);
+  for (const rule of [...scoped, ...global]) {
     if (rule.keyword === '*') return rule;
     if (lower.includes(rule.keyword.toLowerCase())) return rule;
   }

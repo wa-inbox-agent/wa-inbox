@@ -479,8 +479,8 @@ app.post('/api/bot/toggle', (req, res) => {
 });
 
 app.post('/api/bot/rules', (req, res) => {
-  const { keyword, response, type, options } = req.body ?? {};
-  if (!keyword?.trim() || !response?.trim()) {
+  const { keyword, response, type, options, phone_number_id } = req.body ?? {};
+  if (!keyword?.trim() || (type !== 'handoff' && !response?.trim())) {
     return res.status(400).json({ error: 'الكلمة المفتاحية والرد مطلوبان' });
   }
   let opts = null;
@@ -493,7 +493,8 @@ app.post('/api/bot/rules', (req, res) => {
       return res.status(400).json({ error: 'كل خيار يحتاج رقم وعنوان ورد' });
     }
   }
-  const id = addBotRule(keyword, response, type === 'menu' ? 'menu' : 'keyword', opts);
+  const ruleType = type === 'menu' ? 'menu' : type === 'handoff' ? 'handoff' : 'keyword';
+  const id = addBotRule(keyword, response ?? '', ruleType, opts, phone_number_id || null);
   res.json({ ok: true, id });
 });
 
@@ -682,6 +683,37 @@ app.post('/api/quick-send', wrap(async (req, res) => {
 
 app.get('/api/usage', (req, res) => {
   res.json(usageSummary());
+});
+
+// ---------- تصدير التقارير (CSV يفتح في Excel) ----------
+
+const sendCsv = (res, name, header, rows) => {
+  const escCsv = (v) => {
+    const t = String(v ?? '');
+    return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  };
+  const csv = '\uFEFF' + header.join(',') + '\n' + rows.map((r) => r.map(escCsv).join(',')).join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  res.send(csv);
+};
+
+app.get('/api/export/messages-daily.csv', (req, res) => {
+  const data = reportSummary().perDay;
+  sendCsv(res, 'messages-daily.csv', ['day', 'inbound', 'outbound'],
+    data.map((d) => [d.day, d.inbound, d.outbound]));
+});
+
+app.get('/api/export/campaigns.csv', (req, res) => {
+  sendCsv(res, 'campaigns.csv', ['id', 'name', 'template', 'status', 'scheduled_at', 'total', 'sent', 'delivered', 'read', 'failed', 'engagement_pct'],
+    listCampaigns().map((c) => [c.id, c.name, c.template_name, c.status, c.scheduled_at ? new Date(c.scheduled_at).toISOString() : '', c.total, c.sent, c.delivered, c.read, c.failed, c.sent ? Math.round((c.read / c.sent) * 100) : '']));
+});
+
+app.get('/api/export/campaigns/:id.csv', (req, res) => {
+  const data = getCampaign(Number(req.params.id));
+  if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
+  sendCsv(res, `campaign-${data.campaign.id}-recipients.csv`, ['number', 'status', 'error', 'updated_at'],
+    data.recipients.map((r) => [r.wa_id, r.status, r.error ?? '', r.updated_at ? new Date(r.updated_at).toISOString() : '']));
 });
 
 // ---------- الـ API الخارجي (إشعارات أنظمة الغرفة) ----------
