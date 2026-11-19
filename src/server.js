@@ -80,7 +80,7 @@ import {
   markRetrySucceeded,
   fullBackup,
 } from './db.js';
-import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile, getNumberQuality } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -406,7 +406,10 @@ app.post('/webhook', (req, res) => {
               upsertContact({ phone: msg.from, name: contact?.profile?.name ?? null });
               if (isNewConversation) autoAssignRoundRobin(msg.from, phoneNumberId);
               const inboundText = msg.text?.body?.trim() ?? '';
-              if (msg.type === 'text' && /^(إيقاف|ايقاف|اوقف|stop|unsubscribe|إلغاء|الغاء)$/i.test(inboundText)) {
+              const stopText = inboundText.trim();
+              const stopExact = /^(إيقاف|ايقاف|أوقف|اوقف|stop|unsubscribe|إلغاء|الغاء|كفاية|كفايه)$/i.test(stopText);
+              const stopPhrase = /(إلغاء الاشتراك|الغاء الاشتراك|إلغاء إشتراك|لا ترسل|لا ترسلوا|احذف رقمي|أحذف رقمي|شيل رقمي|توقف عن الارسال|توقف عن الإرسال)/i.test(stopText);
+              if (msg.type === 'text' && (stopExact || stopPhrase)) {
                 setContactOptOut(msg.from, true);
               }
               // رسالة ترحيب تلقائية لأول محادثة (عند تفعيلها من إعدادات البوت)
@@ -691,6 +694,27 @@ app.post('/api/campaigns', (req, res) => {
 
 // بدء الإرسال: رسالة كل 1.1 ثانية تقريبًا احترامًا لحدود ميتا
 const running = new Set();
+// إيقاع إرسال متغير يحاكي السلوك الطبيعي (حماية من الحظر)
+const pace = () => new Promise((s) => setTimeout(s, 1200 + Math.floor(Math.random() * 1400)));
+
+// جودة أرقام واتساب من ميتا مع تخزين مؤقت 60 ثانية
+let qualityCache = { at: 0, data: [] };
+app.get('/api/numbers/quality', async (req, res) => {
+  if (Date.now() - qualityCache.at > 60000) {
+    const out = [];
+    for (const p of listPhoneNumbers()) {
+      try {
+        const q = await getNumberQuality(p.phone_number_id);
+        out.push({ phone_number_id: p.phone_number_id, quality_rating: q.quality_rating ?? null, messaging_limit_tier: q.messaging_limit_tier ?? null, name_status: q.name_status ?? null });
+      } catch (e) {
+        out.push({ phone_number_id: p.phone_number_id, quality_rating: null, messaging_limit_tier: null, name_status: null, error: e.message });
+      }
+    }
+    qualityCache = { at: Date.now(), data: out };
+  }
+  res.json({ quality: qualityCache.data });
+});
+
 async function runCampaign(id) {
   if (running.has(id)) return;
   const data = getCampaign(id);
@@ -698,6 +722,8 @@ async function runCampaign(id) {
   running.add(id);
   setCampaignStatus(id, 'running');
   try {
+    let attempts = 0;
+    let failures = 0;
     for (const r of pendingRecipients(id)) {
       if (isOptedOut(r.wa_id)) {
         markRecipient(r.id, { status: 'skipped', error: 'ألغى الاشتراك' });
@@ -710,9 +736,20 @@ async function runCampaign(id) {
         const result = await sendTemplateEx(r.wa_id, data.campaign.template_name, data.campaign.language_code, header, bodyParams);
         markRecipient(r.id, { status: 'sent', waMessageId: result?.messages?.[0]?.id ?? null });
       } catch (err) {
+        failures += 1;
         markRecipient(r.id, { status: 'failed', error: err.message });
       }
-      await new Promise((s) => setTimeout(s, 1100));
+      attempts += 1;
+      // حماية من الحظر: لو نسبة الفشل عدّت 30٪ بعد أول 10 محاولات، أوقف الحملة فورًا
+      if (attempts >= 10 && failures / attempts > 0.3) {
+        for (const rest of pendingRecipients(id)) {
+          markRecipient(rest.id, { status: 'skipped', error: 'إيقاف تلقائي: نسبة فشل مرتفعة (حماية من الحظر)' });
+        }
+        setCampaignStatus(id, 'paused');
+        console.error(`أُوقفت الحملة ${id} تلقائيًا: ${failures}/${attempts} فشل (حماية من الحظر)`);
+        return;
+      }
+      await pace();
     }
     setCampaignStatus(id, 'done');
   } finally {
@@ -839,7 +876,7 @@ app.post('/api/quick-send', wrap(async (req, res) => {
       } catch (err) {
         console.error(`فشل الإرسال السريع إلى ${n}:`, err.message);
       }
-      await new Promise((r) => setTimeout(r, 1100));
+      await pace();
     }
   })();
   res.json({ ok: true, total: numbers.length });

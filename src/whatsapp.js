@@ -64,6 +64,12 @@ export async function sendTemplate(to, templateName, languageCode = 'ar', phoneN
 }
 
 // الملف التجاري للنشاط على واتساب (يظهر للعملاء في صفحة الحساب)
+// جودة الرقم وحدود الإرسال من ميتا (مراقبة الحماية من الحظر)
+export async function getNumberQuality(phoneNumberId = null) {
+  const pn = phoneNumberId || PHONE_NUMBER_ID;
+  return graph(`${pn}?fields=quality_rating,messaging_limit_tier,name_status,display_phone_number`);
+}
+
 export async function getBusinessProfile(phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical`);
