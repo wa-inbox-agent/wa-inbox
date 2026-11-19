@@ -96,6 +96,14 @@
     </div>
     <div id="messages" hidden></div>
     <form id="composer" hidden>
+      <select id="replyMediaType" style="width:92px" title="نوع الميديا">
+        <option value="">نص فقط</option>
+        <option value="image">صورة</option>
+        <option value="document">مستند</option>
+        <option value="video">فيديو</option>
+        <option value="audio">صوت</option>
+      </select>
+      <input id="replyMediaUrl" placeholder="رابط ميديا https:// (اختياري)" dir="ltr" style="max-width:220px" />
       <input id="replyInput" placeholder="اكتب رسالة... (الرد اليدوي يوقف البوت عن هذه المحادثة)" autocomplete="off" />
       <button type="submit">إرسال</button>
     </form>
@@ -149,6 +157,11 @@
       <textarea id="campNumbers" dir="ltr" rows="5"></textarea>
       <label>أو أضف قسمًا من جهات الاتصال (تاج، اختياري)</label>
       <input type="text" id="campTag" placeholder="مثال: vip" dir="ltr" />
+      <label>هيدر ميديا للقالب (رابط صورة/مستند https، اختياري — فقط لو القالب له هيدر ميديا)</label>
+      <div style="display:flex;gap:8px">
+        <select id="campHeaderType" style="width:110px"><option value="image">صورة</option><option value="document">مستند</option><option value="video">فيديو</option></select>
+        <input type="text" id="campHeaderLink" placeholder="https://..." dir="ltr" />
+      </div>
       <label>جدولة الإرسال لوقت لاحق (اختياري)</label>
       <input type="datetime-local" id="campSchedule" dir="ltr" />
       <button class="btn" id="campCreate">إنشاء وبدء الإرسال</button>
@@ -285,7 +298,17 @@ async function loadMessages() {
   for (const m of messages) {
     const div = document.createElement('div');
     div.className = `msg ${m.direction}`;
-    div.innerHTML = `${m.body || `[${m.type}]`}<div class="meta">${m.bot ? '<span class="bot-tag">🤖 بوت</span> ' : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    let mediaHtml = '';
+    if (m.media_id) {
+      const url = `/api/media/${m.id}`;
+      if (m.type === 'image' || m.type === 'sticker') mediaHtml = `<a href="${url}" target="_blank"><img src="${url}" style="max-width:240px;border-radius:6px;display:block" loading="lazy" /></a>`;
+      else if (m.type === 'video') mediaHtml = `<video src="${url}" controls style="max-width:240px;border-radius:6px"></video>`;
+      else if (m.type === 'audio' || m.type === 'voice') mediaHtml = `<audio src="${url}" controls></audio>`;
+      else mediaHtml = `<a href="${url}" target="_blank" style="color:#53bdeb">📎 ${m.filename || 'مستند مرفق'}</a>`;
+    } else if (m.type !== 'text') {
+      mediaHtml = `<span style="color:#8696a0">[${m.type}]</span> `;
+    }
+    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">🤖 بوت</span> ' : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
     $('messages').appendChild(div);
   }
   $('messages').scrollTop = $('messages').scrollHeight;
@@ -294,10 +317,12 @@ async function loadMessages() {
 $('composer').onsubmit = async (e) => {
   e.preventDefault();
   const body = $('replyInput').value.trim();
-  if (!body || !currentWaId) return;
-  $('replyInput').value = '';
+  const media_type = $('replyMediaType').value;
+  const media_url = $('replyMediaUrl').value.trim();
+  if ((!body && !media_url) || !currentWaId) return;
+  $('replyInput').value = $('replyMediaUrl').value = '';
   try {
-    await api(`/api/conversations/${currentWaId}/reply`, { body: { body } });
+    await api(`/api/conversations/${currentWaId}/reply`, { body: { body, media_url: media_type ? media_url : '', media_type } });
   } catch (err) { alert('فشل الإرسال: ' + err.message); }
   await loadMessages();
   loadConvos();
@@ -379,9 +404,9 @@ $('campCreate').onclick = async () => {
   const schedVal = $('campSchedule').value;
   const scheduled_at = schedVal ? new Date(schedVal).getTime() : null;
   try {
-    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value, tag: $('campTag').value.trim(), scheduled_at } });
+    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value, tag: $('campTag').value.trim(), scheduled_at, header_link: $('campHeaderLink').value.trim(), header_type: $('campHeaderType').value } });
     if (!scheduled_at) await api(`/api/campaigns/${r.id}/start`, { body: {} });
-    $('campName').value = $('campNumbers').value = $('campTag').value = '';
+    $('campName').value = $('campNumbers').value = $('campTag').value = $('campHeaderLink').value = '';
     $('campSchedule').value = '';
     loadCampaigns();
     setTimeout(loadCampaigns, 5000);
