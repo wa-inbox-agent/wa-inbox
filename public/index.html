@@ -73,6 +73,17 @@
 </style>
 </head>
 <body>
+<div id="loginOverlay" hidden style="position:fixed;inset:0;background:#0b141a;z-index:50;display:flex;align-items:center;justify-content:center">
+  <form id="loginForm" class="card" style="width:320px">
+    <h3>تسجيل الدخول</h3>
+    <div class="err" id="loginErr"></div>
+    <label>اسم المستخدم</label>
+    <input type="text" id="loginUser" autocomplete="username" />
+    <label>كلمة السر</label>
+    <input type="password" id="loginPass" autocomplete="current-password" style="width:100%;background:#2a3942;border:1px solid #3b4a54;border-radius:8px;padding:10px;color:#e9edef;font-size:14px;outline:none" />
+    <button class="btn" type="submit" style="width:100%">دخول</button>
+  </form>
+</div>
 <header>
   <span class="brand">💬 منصة واتساب</span>
   <nav>
@@ -80,9 +91,12 @@
     <button data-view="templates">القوالب</button>
     <button data-view="campaigns">الحملات</button>
     <button data-view="contacts">جهات الاتصال</button>
+    <button data-view="agents" id="agentsNav" hidden>الموظفون</button>
     <button data-view="bot">البوت</button>
   </nav>
   <span id="health">...</span>
+  <span id="meBadge" style="font-size:13px;color:#8696a0"></span>
+  <button id="logoutBtn" class="btn secondary" style="padding:4px 12px;font-size:12px;margin:0" hidden>خروج</button>
 </header>
 
 <!-- المحادثات -->
@@ -92,6 +106,7 @@
     <div id="empty">اختر محادثة من القائمة</div>
     <div id="chatHeader" hidden>
       <span id="chatTitle"></span>
+      <span id="assignArea" style="font-size:12px;color:#8696a0;display:flex;align-items:center;gap:6px"></span>
       <label class="bot-toggle">🤖 البوت <input type="checkbox" id="convBotToggle" /></label>
     </div>
     <div id="messages" hidden></div>
@@ -198,6 +213,30 @@
   </div>
 </div>
 
+<!-- الموظفون -->
+<div class="view" id="view-agents">
+  <div class="page">
+    <h2>الموظفون</h2>
+    <div class="err" id="agErr"></div>
+    <div class="card">
+      <h3>إضافة موظف</h3>
+      <label>اسم المستخدم (إنجليزي بدون مسافات)</label>
+      <input type="text" id="agUser" dir="ltr" />
+      <label>الاسم</label>
+      <input type="text" id="agName" />
+      <label>كلمة السر (6 أحرف على الأقل)</label>
+      <input type="text" id="agPass" dir="ltr" />
+      <label>الدور</label>
+      <select id="agRole"><option value="agent">موظف</option><option value="admin">مدير</option></select>
+      <button class="btn" id="agAdd">إضافة</button>
+    </div>
+    <div class="card">
+      <h3>القائمة <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadAgents()">تحديث</button></h3>
+      <table id="agTable"><thead><tr><th>المستخدم</th><th>الاسم</th><th>الدور</th><th>نشط</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
 <!-- البوت -->
 <div class="view" id="view-bot">
   <div class="page">
@@ -225,12 +264,97 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+let me = null;
+const showLogin = (show) => { $('loginOverlay').hidden = !show; };
 const api = async (url, opts) => {
   const res = await fetch(url, opts ? { method: opts.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined } : undefined);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && !url.includes('/auth/')) { showLogin(true); throw Object.assign(new Error(data.error || res.status), { data, auth: true }); }
   if (!res.ok) throw Object.assign(new Error(data.error || res.status), { data });
   return data;
 };
+
+$('loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('loginErr').style.display = 'none';
+  try {
+    const r = await api('/api/auth/login', { body: { username: $('loginUser').value.trim(), password: $('loginPass').value } });
+    $('loginPass').value = '';
+    showLogin(false);
+    await initMe(r.agent);
+    loadHealth(); loadConvos();
+  } catch (err) {
+    $('loginErr').textContent = err.message;
+    $('loginErr').style.display = 'block';
+  }
+};
+
+$('logoutBtn').onclick = async () => {
+  await api('/api/auth/logout', { body: {} }).catch(() => {});
+  location.reload();
+};
+
+async function initMe(agent) {
+  me = agent;
+  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? ' (مدير)' : '');
+  $('logoutBtn').hidden = false;
+  $('agentsNav').hidden = agent.role !== 'admin';
+  if (agent.role === 'admin') loadAgents();
+}
+
+async function loadAgents() {
+  try {
+    const { agents } = await api('/api/agents');
+    agentList = agents;
+    const tb = document.querySelector('#agTable tbody');
+    tb.innerHTML = '';
+    for (const a of agents) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td dir="ltr">${a.username}</td><td>${a.name}</td><td>${a.role === 'admin' ? 'مدير' : 'موظف'}</td><td><input type="checkbox" ${a.active ? 'checked' : ''} onchange="toggleAgent(${a.id}, this.checked)" /></td>`;
+      tb.appendChild(tr);
+    }
+  } catch {}
+}
+let agentList = [];
+
+$('agAdd').onclick = async () => {
+  $('agErr').style.display = 'none';
+  try {
+    await api('/api/agents', { body: { username: $('agUser').value.trim(), name: $('agName').value.trim(), password: $('agPass').value, role: $('agRole').value } });
+    $('agUser').value = $('agName').value = $('agPass').value = '';
+    loadAgents();
+  } catch (err) {
+    $('agErr').textContent = err.message;
+    $('agErr').style.display = 'block';
+  }
+};
+
+async function toggleAgent(id, active) { await api(`/api/agents/${id}/toggle`, { body: { active } }); }
+window.toggleAgent = toggleAgent;
+
+async function assignTo(agentId) {
+  if (!currentWaId) return;
+  await api(`/api/conversations/${currentWaId}/assign`, { body: { agent_id: agentId } });
+  loadConvos();
+  renderAssignArea(agentId ? (agentList.find((a) => a.id === agentId)?.name ?? '') : null);
+}
+
+function renderAssignArea(assignedName, assignedId) {
+  const el = $('assignArea');
+  if (!me) { el.innerHTML = ''; return; }
+  let html = assignedName ? `📌 ${assignedName}` : '📌 غير مسندة';
+  if (me.role === 'admin' && agentList.length) {
+    html += ` <select id="assignSel" style="width:auto;padding:2px 6px;font-size:12px"><option value="">فك الإسناد</option>${agentList.filter((a) => a.active).map((a) => `<option value="${a.id}" ${a.id === assignedId ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`;
+  } else if (!assignedName) {
+    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(${me.id})">إسناد إليّ</button>`;
+  } else if (assignedId === me.id) {
+    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(null)">فك الإسناد</button>`;
+  }
+  el.innerHTML = html;
+  const sel = $('assignSel');
+  if (sel) sel.onchange = () => assignTo(sel.value ? Number(sel.value) : null);
+}
+window.assignTo = assignTo;
 const fmtTime = (ms) => new Date(ms).toLocaleString('ar', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
 
 // التبويبات
@@ -242,6 +366,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   if (b.dataset.view === 'templates') loadTemplates();
   if (b.dataset.view === 'campaigns') { loadCampaigns(); loadApprovedTemplates(); }
   if (b.dataset.view === 'contacts') loadContacts();
+  if (b.dataset.view === 'agents') loadAgents();
   if (b.dataset.view === 'bot') loadBot();
 }));
 
@@ -282,6 +407,7 @@ async function openConvo(c) {
   $('chatHeader').hidden = $('messages').hidden = $('composer').hidden = false;
   $('chatTitle').textContent = (c.name || c.wa_id) + ' — ' + c.wa_id;
   $('convBotToggle').checked = Boolean(c.bot_enabled);
+  renderAssignArea(c.assigned_name ?? null, c.assigned_to ?? null);
   await loadMessages();
   loadConvos();
 }
@@ -308,7 +434,7 @@ async function loadMessages() {
     } else if (m.type !== 'text') {
       mediaHtml = `<span style="color:#8696a0">[${m.type}]</span> `;
     }
-    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">🤖 بوت</span> ' : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">🤖 بوت</span> ' : ''}${m.sender ? `<span style="color:#b47bde">${m.sender}</span> ` : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
     $('messages').appendChild(div);
   }
   $('messages').scrollTop = $('messages').scrollHeight;
@@ -485,9 +611,18 @@ $('ruleAdd').onclick = async () => {
 async function delRule(id) { await api(`/api/bot/rules/${id}`, { method: 'DELETE' }); loadBot(); }
 window.delRule = delRule;
 
-loadHealth();
-loadConvos();
-setInterval(() => { loadConvos(); loadMessages(); }, 5000);
+(async () => {
+  try {
+    const { agent } = await api('/api/me');
+    await initMe(agent);
+    showLogin(false);
+  } catch {
+    showLogin(true);
+  }
+  loadHealth();
+  loadConvos().catch(() => {});
+  setInterval(() => { if (me) { loadConvos().catch(() => {}); loadMessages().catch(() => {}); } }, 5000);
+})();
 </script>
 </body>
 </html>
