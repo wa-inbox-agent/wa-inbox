@@ -75,7 +75,8 @@
   .convo:hover { background: #f6f7fb; }
   .convo.active { background: #eceef8; border-inline-start-color: var(--navy); }
   .convo .name { font-weight: 700; font-size: 14.5px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .convo .badge { background: var(--gold); color: var(--navy-2); border-radius: 12px; font-size: 11.5px; padding: 1px 8px; font-weight: 800; flex: none; }
+  .convo .badge { background: #e0245e; color: #fff; border-radius: 12px; font-size: 11.5px; padding: 1px 8px; font-weight: 800; flex: none; }
+  .nav-badge { background: #e0245e; color: #fff; border-radius: 12px; font-size: 11.5px; padding: 1px 9px; font-weight: 800; margin-inline-start: auto; }
   .convo .preview { color: var(--muted); font-size: 13px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f5f0; }
   #chatHeader { background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(24,28,60,.05); z-index: 2; position: relative; }
@@ -227,7 +228,7 @@
     <button data-view="blocked"><span class="ico">🚫</span>المحظورون</button>
     <button data-view="usage"><span class="ico">📈</span>ملخص الاستهلاك</button>
     <div class="nav-group">التواصل</div>
-    <button data-view="inbox"><span class="ico">💬</span>المحادثات المباشرة</button>
+    <button data-view="inbox"><span class="ico">💬</span>المحادثات المباشرة<span class="nav-badge" id="inboxNavBadge" hidden></span></button>
     <button data-view="bot"><span class="ico">🤖</span>إدارة البوت</button>
     <button data-view="contacts"><span class="ico">👥</span>جهات الاتصال</button>
     <button data-view="agents" id="agentsNav" hidden><span class="ico">🧑‍💼</span>الموظفون</button>
@@ -1161,6 +1162,8 @@ async function loadConvos() {
   renderConvos();
   const totalUnread = conversations.filter((c) => c.status !== 'closed').reduce((sum, c) => sum + (c.unread || 0), 0);
   document.title = totalUnread ? `(${totalUnread}) ${t9n('صندوق الوارد')}` : t9n('صندوق الوارد');
+  $('inboxNavBadge').hidden = !totalUnread;
+  $('inboxNavBadge').textContent = totalUnread > 99 ? '99+' : totalUnread;
 }
 function renderConvos() {
   const q = ($('convoSearch').value || '').trim();
