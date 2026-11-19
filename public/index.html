@@ -890,10 +890,10 @@ document.getElementById('langBtn')?.addEventListener('click', () => {
   localStorage.setItem('lang', LANG === 'ar' ? 'en' : 'ar');
   location.reload();
 });
+let BRAND = '';
 applyLang();
 
 let me = null;
-let BRAND = '';
 const showLogin = (show) => { $('loginOverlay').hidden = !show; };
 async function applyBrand() {
   try {
