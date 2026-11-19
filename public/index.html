@@ -92,6 +92,8 @@
     <button data-view="campaigns">الحملات</button>
     <button data-view="contacts">جهات الاتصال</button>
     <button data-view="agents" id="agentsNav" hidden>الموظفون</button>
+    <button data-view="reports" id="reportsNav">التقارير</button>
+    <button data-view="api" id="apiNav" hidden>API</button>
     <button data-view="bot">البوت</button>
   </nav>
   <span id="health">...</span>
@@ -213,6 +215,42 @@
   </div>
 </div>
 
+<!-- التقارير -->
+<div class="view" id="view-reports">
+  <div class="page">
+    <h2>التقارير</h2>
+    <div id="repCards" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px"></div>
+    <div class="card">
+      <h3>الرسائل آخر 14 يوم <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadReports()">تحديث</button></h3>
+      <table id="repTable"><thead><tr><th>اليوم</th><th>واردة</th><th>صادرة</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
+      <h3>أنشط المحادثات</h3>
+      <table id="repTop"><thead><tr><th>الرقم</th><th>عدد الرسائل</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- API -->
+<div class="view" id="view-api">
+  <div class="page">
+    <h2>الـ API الخارجي</h2>
+    <div class="err" id="keyErr"></div>
+    <div class="card">
+      <h3>إنشاء مفتاح جديد</h3>
+      <label>اسم النظام المستخدم للمفتاح</label>
+      <input type="text" id="keyLabel" placeholder="مثال: نظام العضويات" />
+      <button class="btn" id="keyCreate">إنشاء</button>
+      <div id="keyResult" class="hint" dir="ltr" style="direction:ltr;text-align:left;margin-top:10px;word-break:break-all"></div>
+      <div class="hint">المفتاح يظهر مرة واحدة هنا فقط — انسخه فورًا. الاستخدام: POST إلى <span dir="ltr">/api/outbound/send</span> مع هيدر <span dir="ltr">X-API-Key</span> وجسم <span dir="ltr">{"to":"9665…","text":"…"}</span> أو <span dir="ltr">{"to":"9665…","template_name":"…"}</span>.</div>
+    </div>
+    <div class="card">
+      <h3>المفاتيح <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadKeys()">تحديث</button></h3>
+      <table id="keyTable"><thead><tr><th>الاسم</th><th>أنشئ</th><th>آخر استخدام</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
 <!-- الموظفون -->
 <div class="view" id="view-agents">
   <div class="page">
@@ -248,16 +286,44 @@
     </div>
     <div class="card">
       <h3>إضافة قاعدة</h3>
+      <label>النوع</label>
+      <select id="ruleType">
+        <option value="keyword">رد مباشر</option>
+        <option value="menu">قائمة خيارات مرقّمة</option>
+      </select>
       <label>لو الرسالة تحتوي على (اكتب * للرد على أي رسالة)</label>
       <input type="text" id="ruleKeyword" placeholder="مثال: السعر" />
-      <label>يرد بـ</label>
+      <label id="ruleResponseLabel">يرد بـ</label>
       <textarea id="ruleResponse" placeholder="مثال: أسعارنا تبدأ من..."></textarea>
+      <div id="menuOptions" hidden>
+        <label>خيارات القائمة (سطر لكل خيار: رقم | العنوان | الرد)</label>
+        <textarea id="ruleOptions" rows="5" placeholder="1 | الاشتراكات | تفاصيل الاشتراكات...&#10;2 | الفعاليات | تفاصيل الفعاليات..."></textarea>
+      </div>
       <button class="btn" id="ruleAdd">إضافة القاعدة</button>
-      <div class="hint">أول قاعدة تطابق هي اللي بتتنفذ. الرد اليدوي من صندوق الوارد يوقف البوت عن المحادثة دي تلقائيًا حتى تعيد تفعيله من رأس المحادثة.</div>
+      <div class="hint">أول قاعدة تطابق هي اللي بتتنفذ. في القائمة المرقّمة: العميل يرد برقم الخيار فيصله رده. الرد اليدوي من صندوق الوارد يوقف البوت عن المحادثة دي تلقائيًا حتى تعيد تفعيله من رأس المحادثة.</div>
     </div>
     <div class="card">
       <h3>القواعد الحالية</h3>
-      <table id="rulesTable"><thead><tr><th>الكلمة المفتاحية</th><th>الرد</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="rulesTable"><thead><tr><th>النوع</th><th>الكلمة المفتاحية</th><th>الرد</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
+      <h3>الرد خارج أوقات العمل</h3>
+      <div class="switch-row" style="margin-bottom:10px">
+        <input type="checkbox" id="ahEnabled" />
+        <span>تفعيل الرد التلقائي خارج الدوام</span>
+      </div>
+      <label>ساعات العمل (بتوقيت السعودية)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="ahStart" placeholder="09:00" dir="ltr" style="width:90px" />
+        <span style="color:#8696a0">إلى</span>
+        <input type="text" id="ahEnd" placeholder="17:00" dir="ltr" style="width:90px" />
+      </div>
+      <label>أيام العمل (0=الأحد … 6=السبت، مفصولة بفواصل)</label>
+      <input type="text" id="ahDays" dir="ltr" placeholder="0,1,2,3,4" />
+      <label>نص الرد</label>
+      <textarea id="ahMessage"></textarea>
+      <button class="btn" id="ahSave">حفظ الإعدادات</button>
+      <div class="hint">يرد مرة واحدة كل 12 ساعة على كل محادثة خارج أوقات العمل، ويتجاوز قواعد البوت الأخرى في تلك الرسالة.</div>
     </div>
   </div>
 </div>
@@ -299,6 +365,7 @@ async function initMe(agent) {
   $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? ' (مدير)' : '');
   $('logoutBtn').hidden = false;
   $('agentsNav').hidden = agent.role !== 'admin';
+  $('apiNav').hidden = agent.role !== 'admin';
   if (agent.role === 'admin') loadAgents();
 }
 
@@ -367,6 +434,8 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   if (b.dataset.view === 'campaigns') { loadCampaigns(); loadApprovedTemplates(); }
   if (b.dataset.view === 'contacts') loadContacts();
   if (b.dataset.view === 'agents') loadAgents();
+  if (b.dataset.view === 'reports') loadReports();
+  if (b.dataset.view === 'api') loadKeys();
   if (b.dataset.view === 'bot') loadBot();
 }));
 
@@ -588,25 +657,109 @@ async function loadBot() {
   tb.innerHTML = '';
   for (const r of rules) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.keyword}</td><td>${r.response}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">حذف</button></td>`;
+    const opts = r.options ? (typeof r.options === 'string' ? JSON.parse(r.options) : r.options) : null;
+    tr.innerHTML = `<td>${r.type === 'menu' ? '📋 قائمة' : '💬 رد'}</td><td>${r.keyword}</td><td>${r.response}${opts ? '<br><span style="color:#8696a0;font-size:12px">' + opts.map((o) => o.key + ') ' + o.label).join(' — ') + '</span>' : ''}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">حذف</button></td>`;
     tb.appendChild(tr);
   }
-  if (!rules.length) tb.innerHTML = '<tr><td colspan="3" style="color:#8696a0">لا توجد قواعد بعد</td></tr>';
+  if (!rules.length) tb.innerHTML = '<tr><td colspan="4" style="color:#8696a0">لا توجد قواعد بعد</td></tr>';
+  loadAfterHours();
 }
+
+$('ruleType').onchange = (e) => {
+  const menu = e.target.value === 'menu';
+  $('menuOptions').hidden = !menu;
+  $('ruleResponseLabel').textContent = menu ? 'نص يظهر فوق الخيارات' : 'يرد بـ';
+};
+
+async function loadAfterHours() {
+  const ah = await api('/api/bot/after-hours');
+  $('ahEnabled').checked = ah.enabled;
+  $('ahStart').value = ah.work_start;
+  $('ahEnd').value = ah.work_end;
+  $('ahDays').value = ah.work_days;
+  $('ahMessage').value = ah.message;
+}
+
+$('ahSave').onclick = async () => {
+  await api('/api/bot/after-hours', { body: { enabled: $('ahEnabled').checked, work_start: $('ahStart').value.trim(), work_end: $('ahEnd').value.trim(), work_days: $('ahDays').value.trim(), message: $('ahMessage').value } });
+  alert('تم حفظ إعدادات خارج الدوام');
+};
 
 $('botGlobal').onchange = async (e) => { await api('/api/bot/toggle', { body: { enabled: e.target.checked } }); };
 
 $('ruleAdd').onclick = async () => {
   $('botErr').style.display = 'none';
+  const type = $('ruleType').value;
+  let options = null;
+  if (type === 'menu') {
+    options = [];
+    for (const line of $('ruleOptions').value.split('\n')) {
+      if (!line.trim()) continue;
+      const parts = line.split('|').map((p) => p.trim());
+      options.push({ key: parts[0], label: parts[1] ?? '', reply: parts.slice(2).join(' | ') });
+    }
+  }
   try {
-    await api('/api/bot/rules', { body: { keyword: $('ruleKeyword').value, response: $('ruleResponse').value } });
-    $('ruleKeyword').value = $('ruleResponse').value = '';
+    await api('/api/bot/rules', { body: { keyword: $('ruleKeyword').value, response: $('ruleResponse').value, type, options } });
+    $('ruleKeyword').value = $('ruleResponse').value = $('ruleOptions').value = '';
     loadBot();
   } catch (err) {
     $('botErr').textContent = err.message;
     $('botErr').style.display = 'block';
   }
 };
+
+// ===== التقارير =====
+async function loadReports() {
+  const r = await api('/api/reports/summary');
+  const card = (t, v) => `<div class="card" style="min-width:130px;margin:0"><h3 style="margin-bottom:4px">${t}</h3><div style="font-size:22px;font-weight:700">${v ?? 0}</div></div>`;
+  $('repCards').innerHTML =
+    card('رسائل واردة', r.totals.inbound) + card('رسائل صادرة', r.totals.outbound) +
+    card('ردود البوت', r.totals.bot_replies) + card('جهات الاتصال', r.contacts.total) +
+    card('ألغوا الاشتراك', r.contacts.opted_out) + card('حملات', r.campaigns.total) +
+    card('رسائل حملات ناجحة', r.recipients.sent) + card('فاشلة', r.recipients.failed);
+  const tb = document.querySelector('#repTable tbody');
+  tb.innerHTML = '';
+  for (const d of r.perDay) tb.innerHTML += `<tr><td dir="ltr">${d.day}</td><td>${d.inbound}</td><td>${d.outbound}</td></tr>`;
+  if (!r.perDay.length) tb.innerHTML = '<tr><td colspan="3" style="color:#8696a0">لا رسائل بعد</td></tr>';
+  const tp = document.querySelector('#repTop tbody');
+  tp.innerHTML = '';
+  for (const c of r.topConversations) tp.innerHTML += `<tr><td dir="ltr">${c.wa_id}</td><td>${c.messages}</td></tr>`;
+  if (!r.topConversations.length) tp.innerHTML = '<tr><td colspan="2" style="color:#8696a0">—</td></tr>';
+}
+window.loadReports = loadReports;
+
+// ===== مفاتيح API =====
+async function loadKeys() {
+  try {
+    const { keys } = await api('/api/keys');
+    const tb = document.querySelector('#keyTable tbody');
+    tb.innerHTML = '';
+    for (const k of keys) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${k.label}</td><td style="font-size:12px">${fmtTime(k.created_at)}</td><td style="font-size:12px">${k.last_used_at ? fmtTime(k.last_used_at) : 'لم يستخدم'}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delKey(${k.id})">حذف</button></td>`;
+      tb.appendChild(tr);
+    }
+    if (!keys.length) tb.innerHTML = '<tr><td colspan="4" style="color:#8696a0">لا مفاتيح بعد</td></tr>';
+  } catch {}
+}
+window.loadKeys = loadKeys;
+
+$('keyCreate').onclick = async () => {
+  $('keyErr').style.display = 'none';
+  try {
+    const r = await api('/api/keys', { body: { label: $('keyLabel').value.trim() } });
+    $('keyResult').textContent = 'المفتاح (يظهر مرة واحدة): ' + r.key;
+    $('keyLabel').value = '';
+    loadKeys();
+  } catch (err) {
+    $('keyErr').textContent = err.message;
+    $('keyErr').style.display = 'block';
+  }
+};
+
+async function delKey(id) { await api(`/api/keys/${id}`, { method: 'DELETE' }); loadKeys(); }
+window.delKey = delKey;
 
 async function delRule(id) { await api(`/api/bot/rules/${id}`, { method: 'DELETE' }); loadBot(); }
 window.delRule = delRule;
