@@ -61,8 +61,9 @@ import {
   addNote,
   logWebhookEvent,
   recentWebhookEvents,
+  resetFailedRecipients,
 } from './db.js';
-import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -296,7 +297,7 @@ app.post('/webhook', (req, res) => {
                 name: contact?.profile?.name ?? null,
                 waMessageId: msg.id,
                 type: msg.type,
-                body: msg.text?.body ?? msg[msg.type]?.caption ?? null,
+                body: msg.text?.body ?? msg[msg.type]?.caption ?? msg.button?.text ?? msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? null,
                 ts: msg.timestamp ? Number(msg.timestamp) * 1000 : undefined,
                 mediaId: mediaObj?.id ?? null,
                 mimeType: mediaObj?.mime_type ?? null,
@@ -393,14 +394,40 @@ app.get('/api/templates', wrap(async (req, res) => {
 }));
 
 app.post('/api/templates', wrap(async (req, res) => {
-  const { name, category, language, body } = req.body ?? {};
+  const { name, category, language, body, header_type, header_text, footer, buttons, body_examples } = req.body ?? {};
   if (!name || !category || !language || !body) {
     return res.status(400).json({ error: 'الحقول المطلوبة: name, category, language, body' });
   }
   if (!/^[a-z0-9_]+$/.test(name)) {
     return res.status(400).json({ error: 'اسم القالب: حروف إنجليزية صغيرة وأرقام وشرطة سفلية فقط' });
   }
-  res.json({ ok: true, result: await createTemplate({ name, category, language, body }) });
+  const result = await createTemplate({
+    name, category, language, body,
+    headerType: header_type || 'NONE',
+    headerText: header_text || '',
+    footer: footer || '',
+    buttons: Array.isArray(buttons) ? buttons : [],
+    bodyExamples: Array.isArray(body_examples) ? body_examples.map((v) => String(v)) : [],
+  });
+  res.json({ ok: true, result });
+}));
+
+app.delete('/api/templates/:name', wrap(async (req, res) => {
+  await deleteTemplate(req.params.name);
+  res.json({ ok: true });
+}));
+
+// إرسال قالب تجريبي لرقم واحد (للمعاينة قبل الحملات)
+app.post('/api/templates/test', wrap(async (req, res) => {
+  const { to, template_name, language_code, header_link, header_type, body_params } = req.body ?? {};
+  const target = String(to ?? '').replace(/[^\d]/g, '');
+  if (target.length < 8) return res.status(400).json({ error: 'الرقم غير صحيح' });
+  if (!template_name) return res.status(400).json({ error: 'اسم القالب مطلوب' });
+  const header = header_link ? { link: header_link, type: header_type || 'image' } : null;
+  const r = await sendTemplateEx(target, template_name, language_code || 'ar', header, Array.isArray(body_params) ? body_params : []);
+  upsertContact({ phone: target });
+  insertOutbound({ waId: target, waMessageId: r?.messages?.[0]?.id, body: `[قالب: ${template_name}]` });
+  res.json({ ok: true });
 }));
 
 // ---------- البوت ----------
@@ -486,7 +513,8 @@ app.post('/api/campaigns', (req, res) => {
     return res.status(400).json({ error: 'اسم الحملة والقالب وقائمة الأرقام (أو قسم مشتركين) مطلوبة' });
   }
   const sched = scheduled_at ? Number(scheduled_at) : null;
-  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null });
+  const bodyParams = Array.isArray(req.body?.body_params) ? req.body.body_params.map((v) => String(v)) : [];
+  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null, bodyParams });
   res.json({ ok: true, id, total: cleaned.length, scheduled: Boolean(sched) });
 });
 
@@ -506,7 +534,9 @@ async function runCampaign(id) {
       }
       try {
         const header = data.campaign.header_link ? { link: data.campaign.header_link, type: data.campaign.header_type ?? 'image' } : null;
-        const result = await sendTemplateEx(r.wa_id, data.campaign.template_name, data.campaign.language_code, header);
+        let bodyParams = [];
+        try { bodyParams = JSON.parse(data.campaign.body_params ?? '[]'); } catch {}
+        const result = await sendTemplateEx(r.wa_id, data.campaign.template_name, data.campaign.language_code, header, bodyParams);
         markRecipient(r.id, { status: 'sent', waMessageId: result?.messages?.[0]?.id ?? null });
       } catch (err) {
         markRecipient(r.id, { status: 'failed', error: err.message });
@@ -697,6 +727,29 @@ app.get('/api/webhook-events', (req, res) => {
     last_inbound_at: lastInbound?.created_at ?? null,
     events,
   });
+});
+
+// تصدير جهات الاتصال كملف CSV (يفتح في Excel)
+app.get('/api/contacts-export', (req, res) => {
+  const rows = listContacts();
+  const escCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = '\uFEFF' + ['phone,name,tags,opted_out,created_at'].join(',') + '\n' +
+    rows.map((c) => [c.phone, c.name, c.tags, c.opted_out ? 'yes' : 'no', new Date(c.created_at).toISOString()].map(escCsv).join(',')).join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="contacts.csv"');
+  res.send(csv);
+});
+
+// إعادة محاولة الأرقام الفاشلة في حملة
+app.post('/api/campaigns/:id/retry-failed', (req, res) => {
+  const id = Number(req.params.id);
+  const data = getCampaign(id);
+  if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
+  const count = resetFailedRecipients(id);
+  if (count === 0) return res.json({ ok: true, count: 0 });
+  setCampaignStatus(id, 'draft');
+  res.json({ ok: true, count });
+  runCampaign(id);
 });
 
 app.get('/api/health', (req, res) => {

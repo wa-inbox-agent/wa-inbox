@@ -71,18 +71,50 @@ export async function listTemplates() {
   return data?.data ?? [];
 }
 
-// إنشاء قالب جديد وتقديمه للمراجعة
-export async function createTemplate({ name, category, language, body }) {
+// إنشاء قالب جديد وتقديمه للمراجعة (هيدر/فوتر/أزرار/متغيرات)
+export async function createTemplate({ name, category, language, body, headerType = 'NONE', headerText = '', footer = '', buttons = [], bodyExamples = [] }) {
   requireCreds('WABA_ID', 'WHATSAPP_TOKEN');
+  const components = [];
+  if (headerType && headerType !== 'NONE') {
+    const header = { type: 'HEADER', format: headerType };
+    if (headerType === 'TEXT') {
+      header.text = headerText || 'عنوان';
+      if (/\{\{\d+\}\}/.test(header.text)) header.example = { header_text: [header.text.replace(/\{\{\d+\}\}/g, 'مثال')] };
+    }
+    components.push(header);
+  }
+  const bodyComp = { type: 'BODY', text: body };
+  const varCount = (body.match(/\{\{\d+\}\}/g) ?? []).length;
+  if (varCount > 0) {
+    bodyComp.example = { body_text: [bodyExamples.length ? bodyExamples.slice(0, varCount) : Array.from({ length: varCount }, (_, i) => `مثال ${i + 1}`)] };
+  }
+  components.push(bodyComp);
+  if (footer?.trim()) components.push({ type: 'FOOTER', text: footer.trim() });
+  const btns = (buttons ?? []).filter((b) => b?.text?.trim()).slice(0, 3);
+  if (btns.length) {
+    components.push({
+      type: 'BUTTONS',
+      buttons: btns.map((b) => {
+        if (b.type === 'url') {
+          const btn = { type: 'URL', text: b.text.trim(), url: String(b.url ?? '').trim() };
+          if (/\{\{\d+\}\}/.test(btn.url)) btn.example = [btn.url.replace(/\{\{\d+\}\}/g, 'example')];
+          return btn;
+        }
+        if (b.type === 'phone') return { type: 'PHONE_NUMBER', text: b.text.trim(), phone_number: String(b.phone ?? '').trim() };
+        return { type: 'QUICK_REPLY', text: b.text.trim() };
+      }),
+    });
+  }
   return graph(`${WABA_ID}/message_templates`, {
     method: 'POST',
-    body: {
-      name,
-      category,
-      language,
-      components: [{ type: 'BODY', text: body }],
-    },
+    body: { name, category, language, components },
   });
+}
+
+// حذف قالب من حساب الواتساب
+export async function deleteTemplate(name) {
+  requireCreds('WABA_ID', 'WHATSAPP_TOKEN');
+  return graph(`${WABA_ID}/message_templates?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
 }
 
 // جلب رابط تحميل ميديا واردة من ميتا
@@ -113,13 +145,16 @@ export async function sendMedia(to, type, link, caption = null) {
 }
 
 // إرسال قالب مع هيدر ميديا اختياري (رابط صورة/مستند)
-export async function sendTemplateEx(to, templateName, languageCode = 'ar', header = null) {
+export async function sendTemplateEx(to, templateName, languageCode = 'ar', header = null, bodyParams = []) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const components = [];
   if (header?.link && header?.type) {
     const param = { type: header.type };
     param[header.type] = { link: header.link };
     components.push({ type: 'header', parameters: [param] });
+  }
+  if (Array.isArray(bodyParams) && bodyParams.length) {
+    components.push({ type: 'body', parameters: bodyParams.map((t) => ({ type: 'text', text: String(t) })) });
   }
   const template = { name: templateName, language: { code: languageCode } };
   if (components.length) template.components = components;

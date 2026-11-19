@@ -194,14 +194,47 @@
         <option value="ar">العربية (ar)</option>
         <option value="en_US">الإنجليزية (en_US)</option>
       </select>
-      <label>نص الرسالة</label>
-      <textarea id="tplBody" placeholder="مثال: مرحبًا! عرض خاص لك هذا الأسبوع..."></textarea>
+      <label>نص الرسالة (للمتغيرات استخدم {{1}} {{2}} ...)</label>
+      <textarea id="tplBody" placeholder="مثال: مرحبًا {{1}}! عرض خاص لك على {{2}} هذا الأسبوع..."></textarea>
+      <label>أمثلة المتغيرات بالترتيب، مفصولة بـ | (مطلوبة لو النص فيه متغيرات)</label>
+      <input type="text" id="tplExamples" placeholder="أحمد | دورة التصميم" />
+      <label>الهيدر (اختياري)</label>
+      <select id="tplHeaderType">
+        <option value="NONE">بدون</option>
+        <option value="TEXT">نص</option>
+        <option value="IMAGE">صورة</option>
+        <option value="VIDEO">فيديو</option>
+        <option value="DOCUMENT">مستند</option>
+      </select>
+      <div id="tplHeaderTextWrap" hidden>
+        <input type="text" id="tplHeaderText" placeholder="نص الهيدر" />
+      </div>
+      <label>الفوتر (اختياري)</label>
+      <input type="text" id="tplFooter" placeholder="مثال: أكاديمية غرفة جازان" />
+      <label>الأزرار (اختياري، حتى 3)</label>
+      <div id="tplButtons">
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <select class="tplBtnType" style="width:105px"><option value="">بدون</option><option value="quick_reply">رد سريع</option><option value="url">رابط</option><option value="phone">اتصال</option></select>
+          <input class="tplBtnText" placeholder="نص الزر" style="flex:1" />
+          <input class="tplBtnValue" placeholder="الرابط أو رقم الهاتف" dir="ltr" style="flex:1" />
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <select class="tplBtnType" style="width:105px"><option value="">بدون</option><option value="quick_reply">رد سريع</option><option value="url">رابط</option><option value="phone">اتصال</option></select>
+          <input class="tplBtnText" placeholder="نص الزر" style="flex:1" />
+          <input class="tplBtnValue" placeholder="الرابط أو رقم الهاتف" dir="ltr" style="flex:1" />
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <select class="tplBtnType" style="width:105px"><option value="">بدون</option><option value="quick_reply">رد سريع</option><option value="url">رابط</option><option value="phone">اتصال</option></select>
+          <input class="tplBtnText" placeholder="نص الزر" style="flex:1" />
+          <input class="tplBtnValue" placeholder="الرابط أو رقم الهاتف" dir="ltr" style="flex:1" />
+        </div>
+      </div>
       <button class="btn" id="tplCreate">تقديم القالب للمراجعة</button>
       <div class="hint">ميتا تراجع القالب قبل اعتماده (عادة من دقائق لساعات). الحملات ترسل بالقوالب المعتمدة فقط.</div>
     </div>
     <div class="card">
       <h3>القوالب الحالية <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadTemplates()">تحديث</button></h3>
-      <table id="tplTable"><thead><tr><th>الاسم</th><th>الفئة</th><th>اللغة</th><th>الحالة</th></tr></thead><tbody></tbody></table>
+      <table id="tplTable"><thead><tr><th>الاسم</th><th>الفئة</th><th>النص</th><th>الحالة</th><th></th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 </div>
@@ -217,6 +250,8 @@
       <input type="text" id="campName" />
       <label>القالب المعتمد</label>
       <select id="campTemplate"><option value="">— حمّل القوالب أولًا —</option></select>
+      <div id="campTplPreview" class="hint" style="white-space:pre-wrap;background:#0b141a;border-radius:8px;padding:10px;display:none"></div>
+      <div id="campVars"></div>
       <label>الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)</label>
       <textarea id="campNumbers" dir="ltr" rows="5"></textarea>
       <label>أو أضف قسمًا من جهات الاتصال (تاج، اختياري)</label>
@@ -237,6 +272,7 @@
     </div>
     <div class="card" id="campDetail" hidden>
       <h3 id="campDetailTitle"></h3>
+      <button class="btn secondary" id="campRetry" style="padding:6px 16px;font-size:13px;margin:0 0 10px">↻ إعادة إرسال الفاشل</button>
       <table id="campRecTable"><thead><tr><th>الرقم</th><th>الحالة</th><th>ملاحظة</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
@@ -251,11 +287,14 @@
       <h3>استيراد جهات اتصال</h3>
       <label>سطر لكل جهة: الرقم، الاسم (اختياري)، الأقسام/التاجات (اختياري)</label>
       <textarea id="conImport" dir="ltr" rows="4" placeholder="9665xxxxxxxx,أحمد محمد,vip"></textarea>
-      <button class="btn" id="conImportBtn">استيراد</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="conImportBtn">استيراد</button>
+        <label class="btn secondary" style="padding:10px 18px;font-size:13px;margin:0;cursor:pointer">رفع ملف CSV<input type="file" id="conFile" accept=".csv,.txt" hidden /></label>
+      </div>
       <div class="hint">الرقم بالصيغة الدولية بدون +. الرقم الموجود مسبقًا يتحدّث اسمه وأقسامه. كل رقم يرسل رسالة لصندوق الوارد يتسجّل تلقائيًا.</div>
     </div>
     <div class="card">
-      <h3>القائمة <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadContacts()">تحديث</button></h3>
+      <h3>القائمة <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadContacts()">تحديث</button> <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="exportContacts()">تصدير CSV</button></h3>
       <table id="conTable"><thead><tr><th>الرقم</th><th>الاسم</th><th>الأقسام</th><th>يستلم الحملات</th><th></th></tr></thead><tbody></tbody></table>
       <div class="hint">ألغِ التحديد لإيقاف الحملات عن رقم دون حذفه. أي رسالة واردة تحتوي "إيقاف" أو "stop" تلغي الاشتراك تلقائيًا.</div>
     </div>
@@ -706,22 +745,41 @@ async function loadTemplates() {
     const tb = document.querySelector('#tplTable tbody');
     tb.innerHTML = '';
     for (const t of templates) {
+      const bodyText = (t.components ?? []).find((c) => c.type === 'BODY')?.text ?? '';
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td>${t.language}</td><td><span class="pill ${t.status}">${t.status}</span></td>`;
+      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td style="font-size:12px;max-width:260px;white-space:pre-wrap">${esc(bodyText).slice(0, 120)}</td><td><span class="pill ${t.status}">${t.status}</span></td><td style="white-space:nowrap"><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="testTemplate('${t.name}', '${t.language}')">تجربة</button> <button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delTemplate('${t.name}')">حذف</button></td>`;
       tb.appendChild(tr);
     }
-    if (!templates.length) tb.innerHTML = '<tr><td colspan="4" style="color:#8696a0">لا توجد قوالب بعد</td></tr>';
+    if (!templates.length) tb.innerHTML = '<tr><td colspan="5" style="color:#8696a0">لا توجد قوالب بعد</td></tr>';
   } catch (err) {
     $('tplErr').textContent = err.message;
     $('tplErr').style.display = 'block';
   }
 }
 
+$('tplHeaderType').onchange = () => { $('tplHeaderTextWrap').hidden = $('tplHeaderType').value !== 'TEXT'; };
 $('tplCreate').onclick = async () => {
   $('tplErr').style.display = 'none';
   try {
-    await api('/api/templates', { body: { name: $('tplName').value.trim(), category: $('tplCategory').value, language: $('tplLanguage').value, body: $('tplBody').value } });
-    $('tplName').value = $('tplBody').value = '';
+    const btnRows = [...document.querySelectorAll('#tplButtons > div')];
+    const buttons = btnRows.map((row) => ({
+      type: row.querySelector('.tplBtnType').value,
+      text: row.querySelector('.tplBtnText').value.trim(),
+      url: row.querySelector('.tplBtnValue').value.trim(),
+      phone: row.querySelector('.tplBtnValue').value.trim(),
+    })).filter((b) => b.type && b.text);
+    await api('/api/templates', { body: {
+      name: $('tplName').value.trim(),
+      category: $('tplCategory').value,
+      language: $('tplLanguage').value,
+      body: $('tplBody').value,
+      body_examples: $('tplExamples').value.split('|').map((v) => v.trim()).filter(Boolean),
+      header_type: $('tplHeaderType').value,
+      header_text: $('tplHeaderText').value.trim(),
+      footer: $('tplFooter').value.trim(),
+      buttons,
+    } });
+    $('tplName').value = $('tplBody').value = $('tplExamples').value = $('tplHeaderText').value = $('tplFooter').value = '';
     loadTemplates();
     alert('تم تقديم القالب لمراجعة ميتا');
   } catch (err) {
@@ -730,17 +788,52 @@ $('tplCreate').onclick = async () => {
   }
 };
 
+async function delTemplate(name) {
+  if (!confirm(`حذف القالب ${name} نهائيًا من حساب واتساب؟`)) return;
+  await api(`/api/templates/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  loadTemplates();
+}
+window.delTemplate = delTemplate;
+
+async function testTemplate(name, lang) {
+  const to = prompt(`إرسال القالب ${name} تجريبيًا إلى رقم (بالصيغة الدولية بدون +):`, '966');
+  if (!to) return;
+  try {
+    await api('/api/templates/test', { body: { to, template_name: name, language_code: lang || 'ar' } });
+    alert('تم الإرسال ✓');
+  } catch (err) { alert('فشل الإرسال: ' + err.message); }
+}
+window.testTemplate = testTemplate;
+
 // ===== الحملات =====
+let approvedTpls = [];
 async function loadApprovedTemplates() {
   try {
     const { templates } = await api('/api/templates');
+    approvedTpls = templates.filter((t) => t.status === 'APPROVED');
     const sel = $('campTemplate');
     sel.innerHTML = '';
-    const approved = templates.filter((t) => t.status === 'APPROVED');
-    if (!approved.length) sel.innerHTML = '<option value="">لا توجد قوالب معتمدة بعد</option>';
-    for (const t of approved) sel.innerHTML += `<option value="${t.name}" data-lang="${t.language}">${t.name} (${t.language})</option>`;
+    if (!approvedTpls.length) sel.innerHTML = '<option value="">لا توجد قوالب معتمدة بعد</option>';
+    for (const t of approvedTpls) sel.innerHTML += `<option value="${t.name}" data-lang="${t.language}">${t.name} (${t.language})</option>`;
+    renderCampTplPreview();
   } catch {}
 }
+function renderCampTplPreview() {
+  const t = approvedTpls.find((x) => x.name === $('campTemplate').value);
+  const prev = $('campTplPreview');
+  const vars = $('campVars');
+  vars.innerHTML = '';
+  if (!t) { prev.style.display = 'none'; return; }
+  const bodyText = (t.components ?? []).find((c) => c.type === 'BODY')?.text ?? '';
+  prev.textContent = bodyText;
+  prev.style.display = bodyText ? 'block' : 'none';
+  const count = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+  if (count > 0) {
+    vars.innerHTML = '<label>قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)</label>' +
+      Array.from({ length: count }, (_, i) => `<input class="campVar" placeholder="قيمة {{${i + 1}}}" style="margin-bottom:6px" />`).join('');
+  }
+}
+$('campTemplate').onchange = renderCampTplPreview;
 
 async function loadCampaigns() {
   const { campaigns } = await api('/api/campaigns');
@@ -768,13 +861,39 @@ async function showCampaign(id, name) {
 }
 window.showCampaign = showCampaign;
 
+let currentCampaignId = null;
+const origShowCampaign = showCampaign;
+showCampaign = async (id, name) => { currentCampaignId = id; await origShowCampaign(id, name); };
+window.showCampaign = showCampaign;
+
+$('campRetry').onclick = async () => {
+  if (!currentCampaignId) return;
+  try {
+    const r = await api(`/api/campaigns/${currentCampaignId}/retry-failed`, { body: {} });
+    alert(r.count ? `أُعيد إرسال ${r.count} رسالة فاشلة` : 'لا توجد رسائل فاشلة');
+    showCampaign(currentCampaignId, $('campDetailTitle').textContent.replace('مستلمو حملة: ', ''));
+    loadCampaigns();
+  } catch (err) { alert(err.message); }
+};
+
+$('conFile').onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $('conImport').value = await f.text();
+  e.target.value = '';
+};
+
+function exportContacts() { window.open('/api/contacts-export', '_blank'); }
+window.exportContacts = exportContacts;
+
 $('campCreate').onclick = async () => {
   $('campErr').style.display = 'none';
   const sel = $('campTemplate');
   const schedVal = $('campSchedule').value;
   const scheduled_at = schedVal ? new Date(schedVal).getTime() : null;
   try {
-    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value, tag: $('campTag').value.trim(), scheduled_at, header_link: $('campHeaderLink').value.trim(), header_type: $('campHeaderType').value } });
+    const bodyParams = [...document.querySelectorAll('.campVar')].map((i) => i.value.trim() || ' ');
+    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value, tag: $('campTag').value.trim(), scheduled_at, header_link: $('campHeaderLink').value.trim(), header_type: $('campHeaderType').value, body_params: bodyParams } });
     if (!scheduled_at) await api(`/api/campaigns/${r.id}/start`, { body: {} });
     $('campName').value = $('campNumbers').value = $('campTag').value = $('campHeaderLink').value = '';
     $('campSchedule').value = '';

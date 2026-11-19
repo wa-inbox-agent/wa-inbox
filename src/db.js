@@ -357,12 +357,12 @@ export function setConversationBot(waId, enabled) {
 
 // ---------- الحملات ----------
 
-export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null, headerLink = null, headerType = null }) {
+export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null, headerLink = null, headerType = null, bodyParams = [] }) {
   const t = now();
   const status = scheduledAt ? 'scheduled' : 'draft';
   const r = db
-    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, header_link, header_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, headerLink, headerType, t);
+    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, header_link, header_type, body_params, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, headerLink, headerType, JSON.stringify(bodyParams ?? []), t);
   const id = Number(r.lastInsertRowid);
   const ins = db.prepare(`INSERT INTO campaign_recipients (campaign_id, wa_id) VALUES (?, ?)`);
   for (const n of numbers) ins.run(id, n);
@@ -511,6 +511,11 @@ export function reportSummary() {
 
 export function conversationExists(waId) {
   return !!db.prepare(`SELECT 1 FROM conversations WHERE wa_id = ?`).get(waId);
+}
+
+export function resetFailedRecipients(campaignId) {
+  const r = db.prepare(`UPDATE campaign_recipients SET status = 'pending', error = NULL WHERE campaign_id = ? AND status = 'failed'`).run(campaignId);
+  return r.changes;
 }
 
 // ---------- حالة المحادثة (مفتوحة/مغلقة) ----------
