@@ -24,6 +24,11 @@ import {
   dueCampaigns,
   getMessage,
   getBotRule,
+  createApiKey,
+  listApiKeys,
+  deleteApiKey,
+  touchApiKey,
+  reportSummary,
   getPendingMenu,
   setPendingMenu,
   menuText,
@@ -48,7 +53,7 @@ import {
 } from './db.js';
 import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
+import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -539,6 +544,56 @@ app.post('/api/contacts/:phone/optout', (req, res) => {
 app.delete('/api/contacts/:phone', (req, res) => {
   deleteContact(req.params.phone);
   res.json({ ok: true });
+});
+
+// ---------- الـ API الخارجي (إشعارات أنظمة الغرفة) ----------
+
+const hashKey = (k) => createHash('sha256').update(String(k)).digest('hex');
+
+app.post('/api/outbound/send', wrap(async (req, res) => {
+  const key = req.headers['x-api-key'];
+  if (!key || !touchApiKey(hashKey(key))) return res.status(401).json({ error: 'مفتاح API غير صالح' });
+
+  const { to, text, template_name, language_code, header_link, header_type } = req.body ?? {};
+  const target = String(to ?? '').replace(/[^\d]/g, '');
+  if (target.length < 8) return res.status(400).json({ error: 'رقم المستلم مطلوب بالصيغة الدولية' });
+
+  let result;
+  if (template_name) {
+    const header = header_link ? { link: header_link, type: header_type ?? 'image' } : null;
+    result = await sendTemplateEx(target, template_name, language_code ?? 'ar', header);
+    insertOutbound({ waId: target, waMessageId: result?.messages?.[0]?.id, body: `[قالب: ${template_name}]`, type: 'template', sender: 'API' });
+  } else if (text?.trim()) {
+    result = await sendText(target, text.trim());
+    insertOutbound({ waId: target, waMessageId: result?.messages?.[0]?.id, body: text.trim(), sender: 'API' });
+  } else {
+    return res.status(400).json({ error: 'أرسل text أو template_name' });
+  }
+  res.json({ ok: true, result });
+}));
+
+// إدارة المفاتيح (مدير فقط) — المفتاح يظهر مرة واحدة عند الإنشاء
+app.get('/api/keys', requireAdmin, (req, res) => {
+  res.json({ keys: listApiKeys() });
+});
+
+app.post('/api/keys', requireAdmin, (req, res) => {
+  const label = String(req.body?.label ?? '').trim();
+  if (!label) return res.status(400).json({ error: 'اسم المفتاح مطلوب' });
+  const key = 'wk_' + randomBytes(18).toString('hex');
+  const id = createApiKey(label, hashKey(key));
+  res.json({ ok: true, id, key });
+});
+
+app.delete('/api/keys/:id', requireAdmin, (req, res) => {
+  deleteApiKey(Number(req.params.id));
+  res.json({ ok: true });
+});
+
+// ---------- التقارير ----------
+
+app.get('/api/reports/summary', (req, res) => {
+  res.json(reportSummary());
 });
 
 app.get('/api/health', (req, res) => {

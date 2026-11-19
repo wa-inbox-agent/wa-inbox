@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  key_hash TEXT UNIQUE NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT
@@ -406,4 +414,64 @@ export function phonesForTag(tag) {
   return listContacts()
     .filter((c) => !c.opted_out && String(c.tags).toLowerCase().split(/\s+/).includes(t))
     .map((c) => c.phone);
+}
+
+// ---------- مفاتيح الـ API الخارجي ----------
+
+export function createApiKey(label, keyHash) {
+  const r = db.prepare(`INSERT INTO api_keys (label, key_hash, created_at) VALUES (?, ?, ?)`).run(label, keyHash, now());
+  return Number(r.lastInsertRowid);
+}
+
+export function listApiKeys() {
+  return db.prepare(`SELECT id, label, created_at, last_used_at FROM api_keys ORDER BY id DESC`).all();
+}
+
+export function deleteApiKey(id) {
+  db.prepare(`DELETE FROM api_keys WHERE id = ?`).run(id);
+}
+
+export function touchApiKey(keyHash) {
+  const r = db.prepare(`UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?`).run(now(), keyHash);
+  return r.changes > 0;
+}
+
+// ---------- التقارير ----------
+
+export function reportSummary() {
+  const since = now() - 14 * 24 * 3600 * 1000;
+  const perDay = db.prepare(
+    `SELECT date(created_at / 1000, 'unixepoch') AS day,
+       sum(direction = 'inbound') AS inbound,
+       sum(direction = 'outbound') AS outbound
+     FROM messages WHERE created_at >= ? GROUP BY day ORDER BY day DESC`
+  ).all(since);
+  const totals = db.prepare(
+    `SELECT
+       sum(direction = 'inbound') AS inbound,
+       sum(direction = 'outbound') AS outbound,
+       sum(bot = 1) AS bot_replies
+     FROM messages`
+  ).get();
+  const campaigns = db.prepare(
+    `SELECT count(*) AS total,
+       sum(status = 'done') AS done,
+       sum(status = 'running') AS running,
+       sum(status = 'scheduled') AS scheduled
+     FROM campaigns`
+  ).get();
+  const recipients = db.prepare(
+    `SELECT
+       sum(status IN ('sent','delivered','read')) AS sent,
+       sum(status = 'delivered') AS delivered,
+       sum(status = 'read') AS read,
+       sum(status = 'failed') AS failed,
+       sum(status = 'skipped') AS skipped
+     FROM campaign_recipients`
+  ).get();
+  const contacts = db.prepare(`SELECT count(*) AS total, sum(opted_out = 1) AS opted_out FROM contacts`).get();
+  const topConversations = db.prepare(
+    `SELECT wa_id, count(*) AS messages FROM messages GROUP BY wa_id ORDER BY messages DESC LIMIT 5`
+  ).all();
+  return { perDay, totals, campaigns, recipients, contacts, topConversations };
 }
