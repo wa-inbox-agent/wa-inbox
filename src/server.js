@@ -21,6 +21,13 @@ import {
   setCampaignStatus,
   pendingRecipients,
   markRecipient,
+  dueCampaigns,
+  upsertContact,
+  listContacts,
+  setContactOptOut,
+  deleteContact,
+  isOptedOut,
+  phonesForTag,
 } from './db.js';
 import { sendText, sendTemplate, listTemplates, createTemplate } from './whatsapp.js';
 
@@ -96,6 +103,11 @@ app.post('/webhook', (req, res) => {
                 body: msg.text?.body ?? msg[msg.type]?.caption ?? null,
                 ts: msg.timestamp ? Number(msg.timestamp) * 1000 : undefined,
               });
+              upsertContact({ phone: msg.from, name: contact?.profile?.name ?? null });
+              const inboundText = msg.text?.body?.trim() ?? '';
+              if (msg.type === 'text' && /^(إيقاف|ايقاف|اوقف|stop|unsubscribe|إلغاء|الغاء)$/i.test(inboundText)) {
+                setContactOptOut(msg.from, true);
+              }
               await maybeBotReply(msg);
             }
           }
@@ -193,49 +205,94 @@ app.get('/api/campaigns/:id', (req, res) => {
 });
 
 app.post('/api/campaigns', (req, res) => {
-  const { name, template_name, language_code, numbers } = req.body ?? {};
-  const cleaned = [...new Set(
+  const { name, template_name, language_code, numbers, tag, scheduled_at } = req.body ?? {};
+  let cleaned = [...new Set(
     String(numbers ?? '')
       .split(/[\s,;]+/)
       .map((n) => n.replace(/[^\d]/g, ''))
       .filter((n) => n.length >= 8)
   )];
+  if (tag?.trim()) cleaned = [...new Set([...cleaned, ...phonesForTag(tag)])];
+  cleaned = cleaned.filter((p) => !isOptedOut(p));
   if (!name?.trim() || !template_name || cleaned.length === 0) {
-    return res.status(400).json({ error: 'اسم الحملة والقالب وقائمة الأرقام مطلوبة' });
+    return res.status(400).json({ error: 'اسم الحملة والقالب وقائمة الأرقام (أو قسم مشتركين) مطلوبة' });
   }
-  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned });
-  res.json({ ok: true, id, total: cleaned.length });
+  const sched = scheduled_at ? Number(scheduled_at) : null;
+  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched });
+  res.json({ ok: true, id, total: cleaned.length, scheduled: Boolean(sched) });
 });
 
 // بدء الإرسال: رسالة كل 1.1 ثانية تقريبًا احترامًا لحدود ميتا
 const running = new Set();
+async function runCampaign(id) {
+  if (running.has(id)) return;
+  const data = getCampaign(id);
+  if (!data || data.campaign.status === 'done') return;
+  running.add(id);
+  setCampaignStatus(id, 'running');
+  try {
+    for (const r of pendingRecipients(id)) {
+      if (isOptedOut(r.wa_id)) {
+        markRecipient(r.id, { status: 'skipped', error: 'ألغى الاشتراك' });
+        continue;
+      }
+      try {
+        const result = await sendTemplate(r.wa_id, data.campaign.template_name, data.campaign.language_code);
+        markRecipient(r.id, { status: 'sent', waMessageId: result?.messages?.[0]?.id ?? null });
+      } catch (err) {
+        markRecipient(r.id, { status: 'failed', error: err.message });
+      }
+      await new Promise((s) => setTimeout(s, 1100));
+    }
+    setCampaignStatus(id, 'done');
+  } finally {
+    running.delete(id);
+  }
+}
+
 app.post('/api/campaigns/:id/start', (req, res) => {
   const id = Number(req.params.id);
-  if (running.has(id)) return res.status(409).json({ error: 'الحملة تعمل بالفعل' });
   const data = getCampaign(id);
   if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
   if (data.campaign.status === 'done') return res.status(400).json({ error: 'الحملة مكتملة' });
-
-  running.add(id);
-  setCampaignStatus(id, 'running');
+  if (running.has(id)) return res.status(409).json({ error: 'الحملة تعمل بالفعل' });
   res.json({ ok: true });
+  runCampaign(id);
+});
 
-  (async () => {
-    try {
-      for (const r of pendingRecipients(id)) {
-        try {
-          const result = await sendTemplate(r.wa_id, data.campaign.template_name, data.campaign.language_code);
-          markRecipient(r.id, { status: 'sent', waMessageId: result?.messages?.[0]?.id ?? null });
-        } catch (err) {
-          markRecipient(r.id, { status: 'failed', error: err.message });
-        }
-        await new Promise((s) => setTimeout(s, 1100));
-      }
-      setCampaignStatus(id, 'done');
-    } finally {
-      running.delete(id);
-    }
-  })();
+// منفّذ الحملات المجدولة: فحص كل 20 ثانية
+setInterval(() => {
+  for (const c of dueCampaigns()) runCampaign(c.id);
+}, 20000);
+
+// ---------- جهات الاتصال ----------
+
+app.get('/api/contacts', (req, res) => {
+  res.json({ contacts: listContacts() });
+});
+
+app.post('/api/contacts/import', (req, res) => {
+  const lines = String(req.body?.text ?? '').split(/\r?\n/);
+  let count = 0;
+  for (const line of lines) {
+    const parts = line.split(/[,\t]/).map((p) => p.trim());
+    const phone = (parts[0] ?? '').replace(/[^\d]/g, '');
+    if (phone.length < 8) continue;
+    upsertContact({ phone, name: parts[1] || null, tags: parts[2] || null });
+    count++;
+  }
+  res.json({ ok: true, count });
+});
+
+app.post('/api/contacts/:phone/optout', (req, res) => {
+  upsertContact({ phone: req.params.phone });
+  setContactOptOut(req.params.phone, Boolean(req.body?.opted_out));
+  res.json({ ok: true });
+});
+
+app.delete('/api/contacts/:phone', (req, res) => {
+  deleteContact(req.params.phone);
+  res.json({ ok: true });
 });
 
 app.get('/api/health', (req, res) => {

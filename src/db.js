@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS contacts (
+  phone TEXT PRIMARY KEY,
+  name TEXT,
+  tags TEXT NOT NULL DEFAULT '',
+  opted_out INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS campaign_recipients (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   campaign_id INTEGER NOT NULL,
@@ -70,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_recipients_wamid ON campaign_recipients(wa_messag
 try { db.exec(`ALTER TABLE conversations ADD COLUMN bot_enabled INTEGER NOT NULL DEFAULT 1`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN bot INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { db.exec(`INSERT OR IGNORE INTO bot_settings (id, enabled) VALUES (1, 1)`); } catch {}
+try { db.exec(`ALTER TABLE campaigns ADD COLUMN scheduled_at INTEGER`); } catch {}
 
 const now = () => Date.now();
 
@@ -172,11 +181,12 @@ export function setConversationBot(waId, enabled) {
 
 // ---------- الحملات ----------
 
-export function createCampaign({ name, templateName, languageCode, numbers }) {
+export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null }) {
   const t = now();
+  const status = scheduledAt ? 'scheduled' : 'draft';
   const r = db
-    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, created_at) VALUES (?, ?, ?, 'draft', ?)`)
-    .run(name, templateName, languageCode ?? 'ar', t);
+    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, t);
   const id = Number(r.lastInsertRowid);
   const ins = db.prepare(`INSERT INTO campaign_recipients (campaign_id, wa_id) VALUES (?, ?)`);
   for (const n of numbers) ins.run(id, n);
@@ -220,4 +230,45 @@ export function markRecipient(id, { status, waMessageId = null, error = null }) 
   db.prepare(
     `UPDATE campaign_recipients SET status = ?, wa_message_id = COALESCE(?, wa_message_id), error = ?, updated_at = ? WHERE id = ?`
   ).run(status, waMessageId, error, now(), id);
+}
+
+export function dueCampaigns() {
+  return db
+    .prepare(`SELECT id FROM campaigns WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?`)
+    .all(now());
+}
+
+// ---------- جهات الاتصال ----------
+
+export function upsertContact({ phone, name = null, tags = null }) {
+  db.prepare(
+    `INSERT INTO contacts (phone, name, tags, created_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(phone) DO UPDATE SET
+       name = COALESCE(excluded.name, contacts.name),
+       tags = COALESCE(excluded.tags, contacts.tags)`
+  ).run(phone, name, tags ?? '', now());
+}
+
+export function listContacts() {
+  return db.prepare(`SELECT * FROM contacts ORDER BY created_at DESC`).all();
+}
+
+export function setContactOptOut(phone, optedOut) {
+  db.prepare(`UPDATE contacts SET opted_out = ? WHERE phone = ?`).run(optedOut ? 1 : 0, phone);
+}
+
+export function deleteContact(phone) {
+  db.prepare(`DELETE FROM contacts WHERE phone = ?`).run(phone);
+}
+
+export function isOptedOut(phone) {
+  return Boolean(db.prepare(`SELECT opted_out FROM contacts WHERE phone = ?`).get(phone)?.opted_out);
+}
+
+// أرقام قسم معيّن (تاج) من المشتركين فقط
+export function phonesForTag(tag) {
+  const t = String(tag).trim().toLowerCase();
+  return listContacts()
+    .filter((c) => !c.opted_out && String(c.tags).toLowerCase().split(/\s+/).includes(t))
+    .map((c) => c.phone);
 }

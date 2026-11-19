@@ -61,6 +61,8 @@
   .pill.REJECTED, .pill.failed { background: #f15c6d22; color: #f15c6d; }
   .pill.delivered { background: #53bdeb22; color: #53bdeb; }
   .pill.running { background: #53bdeb22; color: #53bdeb; }
+  .pill.skipped, .pill.scheduled { background: #b47bde22; color: #b47bde; }
+  input[type=datetime-local] { width: 100%; background: #2a3942; border: 1px solid #3b4a54; border-radius: 8px; padding: 10px; color: #e9edef; font-size: 14px; outline: none; font-family: inherit; }
   .pill.done { background: #00a88422; color: #00a884; }
   .pill.draft { background: #8696a022; color: #8696a0; }
   .err { background: #f15c6d22; color: #f15c6d; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; display: none; }
@@ -77,6 +79,7 @@
     <button data-view="inbox" class="active">المحادثات</button>
     <button data-view="templates">القوالب</button>
     <button data-view="campaigns">الحملات</button>
+    <button data-view="contacts">جهات الاتصال</button>
     <button data-view="bot">البوت</button>
   </nav>
   <span id="health">...</span>
@@ -144,16 +147,40 @@
       <select id="campTemplate"><option value="">— حمّل القوالب أولًا —</option></select>
       <label>الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)</label>
       <textarea id="campNumbers" dir="ltr" rows="5"></textarea>
+      <label>أو أضف قسمًا من جهات الاتصال (تاج، اختياري)</label>
+      <input type="text" id="campTag" placeholder="مثال: vip" dir="ltr" />
+      <label>جدولة الإرسال لوقت لاحق (اختياري)</label>
+      <input type="datetime-local" id="campSchedule" dir="ltr" />
       <button class="btn" id="campCreate">إنشاء وبدء الإرسال</button>
-      <div class="hint">الإرسال برسالة كل ثانية تقريبًا. القالب يرسل كما هو لكل رقم؛ تجنّب الإزعاج عشان رقمك ما يتبلّغش.</div>
+      <div class="hint">الإرسال برسالة كل ثانية تقريبًا. القالب يرسل كما هو لكل رقم؛ تجنّب الإزعاج عشان رقمك ما يتبلّغش. من ألغى اشتراكه لا تصله الحملة. لو حددت وقت جدولة، الحملة تبدأ لوحدها في الموعد.</div>
     </div>
     <div class="card">
       <h3>الحملات <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadCampaigns()">تحديث</button></h3>
-      <table id="campTable"><thead><tr><th>الاسم</th><th>القالب</th><th>الإجمالي</th><th>ناجح</th><th>فاشل</th><th>الحالة</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="campTable"><thead><tr><th>الاسم</th><th>القالب</th><th>الإجمالي</th><th>ناجح</th><th>فاشل</th><th>الحالة</th><th>الموعد</th><th></th></tr></thead><tbody></tbody></table>
     </div>
     <div class="card" id="campDetail" hidden>
       <h3 id="campDetailTitle"></h3>
       <table id="campRecTable"><thead><tr><th>الرقم</th><th>الحالة</th><th>ملاحظة</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- جهات الاتصال -->
+<div class="view" id="view-contacts">
+  <div class="page">
+    <h2>جهات الاتصال</h2>
+    <div class="err" id="conErr"></div>
+    <div class="card">
+      <h3>استيراد جهات اتصال</h3>
+      <label>سطر لكل جهة: الرقم، الاسم (اختياري)، الأقسام/التاجات (اختياري)</label>
+      <textarea id="conImport" dir="ltr" rows="4" placeholder="9665xxxxxxxx,أحمد محمد,vip"></textarea>
+      <button class="btn" id="conImportBtn">استيراد</button>
+      <div class="hint">الرقم بالصيغة الدولية بدون +. الرقم الموجود مسبقًا يتحدّث اسمه وأقسامه. كل رقم يرسل رسالة لصندوق الوارد يتسجّل تلقائيًا.</div>
+    </div>
+    <div class="card">
+      <h3>القائمة <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadContacts()">تحديث</button></h3>
+      <table id="conTable"><thead><tr><th>الرقم</th><th>الاسم</th><th>الأقسام</th><th>يستلم الحملات</th><th></th></tr></thead><tbody></tbody></table>
+      <div class="hint">ألغِ التحديد لإيقاف الحملات عن رقم دون حذفه. أي رسالة واردة تحتوي "إيقاف" أو "stop" تلغي الاشتراك تلقائيًا.</div>
     </div>
   </div>
 </div>
@@ -201,6 +228,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   $('view-' + b.dataset.view).classList.add('active');
   if (b.dataset.view === 'templates') loadTemplates();
   if (b.dataset.view === 'campaigns') { loadCampaigns(); loadApprovedTemplates(); }
+  if (b.dataset.view === 'contacts') loadContacts();
   if (b.dataset.view === 'bot') loadBot();
 }));
 
@@ -325,10 +353,10 @@ async function loadCampaigns() {
   tb.innerHTML = '';
   for (const c of campaigns) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${c.status}</span></td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">التفاصيل</button></td>`;
+    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${c.status}</span></td><td style="font-size:12px">${c.scheduled_at ? fmtTime(c.scheduled_at) : '—'}</td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">التفاصيل</button></td>`;
     tb.appendChild(tr);
   }
-  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="7" style="color:#8696a0">لا توجد حملات بعد</td></tr>';
+  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="8" style="color:#8696a0">لا توجد حملات بعد</td></tr>';
 }
 
 async function showCampaign(id, name) {
@@ -348,18 +376,58 @@ window.showCampaign = showCampaign;
 $('campCreate').onclick = async () => {
   $('campErr').style.display = 'none';
   const sel = $('campTemplate');
+  const schedVal = $('campSchedule').value;
+  const scheduled_at = schedVal ? new Date(schedVal).getTime() : null;
   try {
-    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value } });
-    await api(`/api/campaigns/${r.id}/start`, { body: {} });
-    $('campName').value = $('campNumbers').value = '';
+    const r = await api('/api/campaigns', { body: { name: $('campName').value.trim(), template_name: sel.value, language_code: sel.selectedOptions[0]?.dataset.lang || 'ar', numbers: $('campNumbers').value, tag: $('campTag').value.trim(), scheduled_at } });
+    if (!scheduled_at) await api(`/api/campaigns/${r.id}/start`, { body: {} });
+    $('campName').value = $('campNumbers').value = $('campTag').value = '';
+    $('campSchedule').value = '';
     loadCampaigns();
     setTimeout(loadCampaigns, 5000);
-    alert(`بدأت الحملة لـ ${r.total} رقم`);
+    alert(scheduled_at ? `اتجدولت الحملة لـ ${r.total} رقم` : `بدأت الحملة لـ ${r.total} رقم`);
   } catch (err) {
     $('campErr').textContent = err.message;
     $('campErr').style.display = 'block';
   }
 };
+
+// ===== جهات الاتصال =====
+async function loadContacts() {
+  const { contacts } = await api('/api/contacts');
+  const tb = document.querySelector('#conTable tbody');
+  tb.innerHTML = '';
+  for (const c of contacts) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td dir="ltr">${c.phone}</td><td>${c.name || '—'}</td><td>${c.tags || '—'}</td><td><input type="checkbox" ${c.opted_out ? '' : 'checked'} onchange="toggleOptOut('${c.phone}', !this.checked)" /></td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delContact('${c.phone}')">حذف</button></td>`;
+    tb.appendChild(tr);
+  }
+  if (!contacts.length) tb.innerHTML = '<tr><td colspan="5" style="color:#8696a0">لا توجد جهات اتصال بعد</td></tr>';
+}
+
+$('conImportBtn').onclick = async () => {
+  $('conErr').style.display = 'none';
+  try {
+    const r = await api('/api/contacts/import', { body: { text: $('conImport').value } });
+    $('conImport').value = '';
+    loadContacts();
+    alert(`تم استيراد/تحديث ${r.count} جهة اتصال`);
+  } catch (err) {
+    $('conErr').textContent = err.message;
+    $('conErr').style.display = 'block';
+  }
+};
+
+async function toggleOptOut(phone, optedOut) {
+  await api(`/api/contacts/${phone}/optout`, { body: { opted_out: optedOut } });
+}
+window.toggleOptOut = toggleOptOut;
+
+async function delContact(phone) {
+  await api(`/api/contacts/${phone}`, { method: 'DELETE' });
+  loadContacts();
+}
+window.delContact = delContact;
 
 // ===== البوت =====
 async function loadBot() {
