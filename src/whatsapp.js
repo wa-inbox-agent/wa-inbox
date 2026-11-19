@@ -161,6 +161,16 @@ export async function sendMedia(to, type, link, caption = null, phoneNumberId = 
 }
 
 // إرسال قالب مع هيدر ميديا اختياري (رابط صورة/مستند)
+// رسالة تفاعلية: أزرار (حتى 3) أو قائمة خيارات (حتى 10)
+export async function sendInteractive(to, interactive, phoneNumberId = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    body: { messaging_product: 'whatsapp', to, type: 'interactive', interactive },
+  });
+  return data;
+}
+
 // رفع ملف ميديا من الجهاز إلى ميتا واسترجاع media id (بديل الرابط العام)
 export async function uploadMedia(buf, mimeType, filename, phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');

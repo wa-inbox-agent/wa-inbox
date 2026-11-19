@@ -69,7 +69,7 @@ import {
   recentWebhookEvents,
   resetFailedRecipients,
 } from './db.js';
-import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -229,12 +229,43 @@ async function sendBotText(waId, body, phoneNumberId = null) {
   }
 }
 
+// إرسال قائمة خيارات البوت كأزرار واتساب تفاعلية (حتى 3) أو قائمة (حتى 10)، وإلا كنص مرقّم
+async function sendBotMenu(waId, rule, phoneNumberId = null) {
+  const opts = typeof rule.options === 'string' ? JSON.parse(rule.options) : rule.options ?? [];
+  const optId = (o) => `r${rule.id}_o${o.key}`;
+  try {
+    let interactive;
+    if (opts.length <= 3) {
+      interactive = {
+        type: 'button',
+        body: { text: rule.response || 'اختر:' },
+        action: { buttons: opts.map((o) => ({ type: 'reply', reply: { id: optId(o), title: String(o.label).slice(0, 20) } })) },
+      };
+    } else if (opts.length <= 10) {
+      interactive = {
+        type: 'list',
+        body: { text: rule.response || 'اختر من القائمة:' },
+        action: { button: 'الخيارات', sections: [{ title: 'الخيارات', rows: opts.map((o) => ({ id: optId(o), title: String(o.label).slice(0, 24) })) }] },
+      };
+    }
+    if (interactive) {
+      const result = await sendInteractive(waId, interactive, phoneNumberId);
+      insertOutbound({ waId, phoneNumberId, waMessageId: result?.messages?.[0]?.id, body: menuText(rule), bot: 1, type: 'interactive' });
+      return;
+    }
+  } catch (err) {
+    console.error('فشل القائمة التفاعلية، نرسل نصًا بديلًا:', err.message);
+  }
+  await sendBotText(waId, menuText(rule), phoneNumberId);
+}
+
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
 async function maybeBotReply(msg, phoneNumberId = null) {
-  if (msg.type !== 'text') return;
+  if (msg.type !== 'text' && msg.type !== 'interactive') return;
   if (!getBotSettings().enabled) return;
   if (!getConversationBot(msg.from, phoneNumberId)) return;
-  const text = msg.text?.body ?? '';
+  const text = msg.text?.body ?? msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? '';
+  const selId = msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null;
 
   // خارج الدوام: رد واحد كل 12 ساعة لكل محادثة ويتجاوز باقي القواعد
   if (isAfterHours()) {
@@ -245,23 +276,29 @@ async function maybeBotReply(msg, phoneNumberId = null) {
     return;
   }
 
-  // قائمة معلّقة: رد برقم الخيار
+  // قائمة معلّقة: الاختيار بضغطة زر/صف (id) أو برقم الخيار أو بنصه
   const pendingId = getPendingMenu(msg.from, phoneNumberId);
   if (pendingId) {
-    setPendingMenu(msg.from, null, phoneNumberId);
     const rule = getBotRule(pendingId);
-    const opt = (rule?.options ?? []).find((o) => o.key === text.trim());
+    const opts = rule ? (typeof rule.options === 'string' ? JSON.parse(rule.options) : rule.options ?? []) : [];
+    const opt = opts.find((o) => (selId && selId === `r${rule.id}_o${o.key}`) || o.key === text.trim() || o.label === text.trim());
     if (opt) {
+      setPendingMenu(msg.from, null, phoneNumberId);
       await sendBotText(msg.from, opt.reply, phoneNumberId);
       return;
     }
-    // لم يختر رقمًا صحيحًا: نكمل للمطابقة العادية
+    // اختيار غير مفهوم: نوضّح ونعيد عرض القائمة التفاعلية
+    if (rule) {
+      await sendBotMenu(msg.from, rule, phoneNumberId);
+      return;
+    }
+    setPendingMenu(msg.from, null, phoneNumberId);
   }
 
-  const rule = matchBotRule(text);
+  const rule = matchBotRule(text, phoneNumberId);
   if (!rule) return;
   if (rule.type === 'menu') {
-    await sendBotText(msg.from, menuText(rule), phoneNumberId);
+    await sendBotMenu(msg.from, rule, phoneNumberId);
     setPendingMenu(msg.from, rule.id, phoneNumberId);
   } else {
     await sendBotText(msg.from, rule.response, phoneNumberId);
