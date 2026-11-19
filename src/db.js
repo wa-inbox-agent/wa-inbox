@@ -140,6 +140,8 @@ try { db.exec(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT
 try { db.exec(`ALTER TABLE contacts ADD COLUMN notes TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN body_params TEXT`); } catch {}
 try { db.exec(`ALTER TABLE bot_rules ADD COLUMN phone_number_id TEXT`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN quoted_wa_id TEXT`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN labels TEXT DEFAULT ''`); } catch {}
 
 // ---------- تعدد الأرقام (قسم مستقل لكل رقم واتساب) ----------
 try {
@@ -251,13 +253,13 @@ export function snapshotTo(outPath) {
   db.exec(`VACUUM INTO '${outPath}'`);
 }
 
-export function upsertInbound({ waId, phoneNumberId = null, name, waMessageId, type, body, ts, mediaId = null, mimeType = null, filename = null }) {
+export function upsertInbound({ waId, phoneNumberId = null, name, waMessageId, type, body, ts, mediaId = null, mimeType = null, filename = null, quotedWaId = null }) {
   const t = ts ?? now();
   const pn = phoneNumberId ?? defaultPhoneNumberId();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, media_id, mime_type, filename, created_at, phone_number_id)
-     VALUES (?, ?, 'inbound', ?, ?, 'received', ?, ?, ?, ?, ?)`
-  ).run(waMessageId ?? null, waId, type, body ?? null, mediaId, mimeType, filename, t, pn);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, media_id, mime_type, filename, created_at, phone_number_id, quoted_wa_id)
+     VALUES (?, ?, 'inbound', ?, ?, 'received', ?, ?, ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body ?? null, mediaId, mimeType, filename, t, pn, quotedWaId);
 
   db.prepare(
     `INSERT INTO conversations (wa_id, phone_number_id, name, last_message, last_message_at, unread)
@@ -270,13 +272,13 @@ export function upsertInbound({ waId, phoneNumberId = null, name, waMessageId, t
   ).run(waId, pn, name ?? null, body ?? `[${type}]`, t);
 }
 
-export function insertOutbound({ waId, phoneNumberId = null, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null, sender = null }) {
+export function insertOutbound({ waId, phoneNumberId = null, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null, sender = null, quotedWaId = null }) {
   const t = now();
   const pn = phoneNumberId ?? defaultPhoneNumberId();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, sender, created_at, phone_number_id)
-     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?, ?, ?)`
-  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, sender, t, pn);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, sender, created_at, phone_number_id, quoted_wa_id)
+     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, sender, t, pn, quotedWaId);
 
   db.prepare(
     `INSERT INTO conversations (wa_id, phone_number_id, last_message, last_message_at, unread)
@@ -315,6 +317,11 @@ export function listConversations(agent = null) {
        ORDER BY c.last_message_at DESC`
     )
     .all();
+}
+
+export function setConversationLabels(waId, labels, phoneNumberId = null) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  db.prepare(`UPDATE conversations SET labels = ? WHERE wa_id = ? AND phone_number_id = ?`).run(String(labels ?? '').trim(), waId, pn);
 }
 
 export function assignConversation(waId, agentId, phoneNumberId = null) {
@@ -358,7 +365,14 @@ export function getMessage(id) {
 export function listMessages(waId, phoneNumberId = null) {
   const pn = phoneNumberId ?? defaultPhoneNumberId();
   db.prepare(`UPDATE conversations SET unread = 0 WHERE wa_id = ? AND phone_number_id = ?`).run(waId, pn);
-  return db.prepare(`SELECT * FROM messages WHERE wa_id = ? AND phone_number_id = ? ORDER BY created_at ASC`).all(waId, pn);
+  return db
+    .prepare(
+      `SELECT m.*, q.body AS quoted_body, q.type AS quoted_type, q.direction AS quoted_direction, q.sender AS quoted_sender
+       FROM messages m
+       LEFT JOIN messages q ON q.wa_message_id = m.quoted_wa_id AND q.wa_id = m.wa_id AND q.phone_number_id = m.phone_number_id
+       WHERE m.wa_id = ? AND m.phone_number_id = ? ORDER BY m.created_at ASC`
+    )
+    .all(waId, pn);
 }
 
 // ---------- البوت ----------

@@ -32,7 +32,7 @@ async function graph(pathname, { method = 'GET', body } = {}) {
 }
 
 // إرسال رسالة نصية (داخل نافذة الـ 24 ساعة فقط)
-export async function sendText(to, body, phoneNumberId = null) {
+export async function sendText(to, body, phoneNumberId = null, quotedWaId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
@@ -40,6 +40,7 @@ export async function sendText(to, body, phoneNumberId = null) {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to,
+      ...(quotedWaId ? { context: { message_id: quotedWaId } } : {}),
       type: 'text',
       text: { preview_url: true, body },
     },
@@ -148,13 +149,13 @@ export async function downloadMedia(url) {
 }
 
 // إرسال ميديا برابط عام (داخل نافذة الـ 24 ساعة): image/document/audio/video
-export async function sendMedia(to, type, link, caption = null, phoneNumberId = null) {
+export async function sendMedia(to, type, link, caption = null, phoneNumberId = null, quotedWaId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const media = { link };
   if (caption && (type === 'image' || type === 'video' || type === 'document')) media.caption = caption;
   const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
-    body: { messaging_product: 'whatsapp', to, type, [type]: media },
+    body: { messaging_product: 'whatsapp', to, ...(quotedWaId ? { context: { message_id: quotedWaId } } : {}), type, [type]: media },
   });
   return data;
 }
@@ -182,13 +183,13 @@ export async function uploadMedia(buf, mimeType, filename, phoneNumberId = null)
 }
 
 // إرسال ميديا مرفوعة مسبقًا بـ media id
-export async function sendMediaId(to, type, id, caption = null, phoneNumberId = null) {
+export async function sendMediaId(to, type, id, caption = null, phoneNumberId = null, quotedWaId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const media = { id };
   if (caption && (type === 'image' || type === 'video' || type === 'document')) media.caption = caption;
   const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
-    body: { messaging_product: 'whatsapp', to, type, [type]: media },
+    body: { messaging_product: 'whatsapp', to, ...(quotedWaId ? { context: { message_id: quotedWaId } } : {}), type, [type]: media },
   });
   return data;
 }

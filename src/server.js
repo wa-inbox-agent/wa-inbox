@@ -14,7 +14,7 @@ import {
   deleteBotRule,
   matchBotRule,
   getConversationBot,
-  setConversationBot,
+  setConversationBot, setConversationLabels,
   createCampaign,
   listCampaigns,
   getCampaign,
@@ -317,6 +317,7 @@ app.post('/webhook', (req, res) => {
                 mediaId: mediaObj?.id ?? null,
                 mimeType: mediaObj?.mime_type ?? null,
                 filename: mediaObj?.filename ?? null,
+                quotedWaId: msg.context?.id ?? null,
               });
               upsertContact({ phone: msg.from, name: contact?.profile?.name ?? null });
               const inboundText = msg.text?.body?.trim() ?? '';
@@ -388,21 +389,23 @@ app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
   const body = String(req.body?.body ?? '').trim();
   const mediaUrl = String(req.body?.media_url ?? '').trim();
   const mediaId = String(req.body?.media_id ?? '').trim();
+  const quotedMsg = req.body?.quoted_id ? getMessage(Number(req.body.quoted_id)) : null;
+  const quotedWaId = quotedMsg?.wa_message_id ?? null;
   const mediaType = String(req.body?.media_type ?? 'image');
   const pn = req.body?.phone_number_id ? String(req.body.phone_number_id) : null;
   if (!body && !mediaUrl) return res.status(400).json({ error: 'نص الرسالة أو رابط الميديا مطلوب' });
 
   let result;
   if (mediaId) {
-    result = await sendMediaId(waId, mediaType, mediaId, body || null, pn);
-    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId, sender: req.agent?.name ?? null });
+    result = await sendMediaId(waId, mediaType, mediaId, body || null, pn, quotedWaId);
+    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId, sender: req.agent?.name ?? null, quotedWaId });
   } else if (mediaUrl) {
     if (!/^https:\/\//.test(mediaUrl)) return res.status(400).json({ error: 'رابط الميديا لازم يبدأ بـ https://' });
-    result = await sendMedia(waId, mediaType, mediaUrl, body || null, pn);
-    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl, sender: req.agent?.name ?? null });
+    result = await sendMedia(waId, mediaType, mediaUrl, body || null, pn, quotedWaId);
+    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl, sender: req.agent?.name ?? null, quotedWaId });
   } else {
-    result = await sendText(waId, body, pn);
-    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body, sender: req.agent?.name ?? null });
+    result = await sendText(waId, body, pn, quotedWaId);
+    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body, sender: req.agent?.name ?? null, quotedWaId });
   }
   // تدخل بشري: نوقف البوت عن هذه المحادثة حتى يعاد تفعيله يدويًا
   setConversationBot(waId, false, pn);
@@ -431,6 +434,12 @@ app.get('/api/media/:messageId', wrap(async (req, res) => {
   if (msg.filename) res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(msg.filename)}`);
   createReadStream(cachePath).pipe(res);
 }));
+
+// وسوم المحادثة (تنظيم داخلي)
+app.post('/api/conversations/:waId/labels', (req, res) => {
+  setConversationLabels(req.params.waId, String(req.body?.labels ?? ''), req.body?.pn ?? null);
+  res.json({ ok: true });
+});
 
 // تفعيل/إيقاف البوت لمحادثة واحدة
 app.post('/api/conversations/:waId/bot', (req, res) => {

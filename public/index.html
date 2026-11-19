@@ -78,7 +78,7 @@
   .convo .badge { background: var(--gold); color: var(--navy-2); border-radius: 12px; font-size: 11.5px; padding: 1px 8px; font-weight: 800; flex: none; }
   .convo .preview { color: var(--muted); font-size: 13px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f5f0; }
-  #chatHeader { background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(24,28,60,.05); z-index: 2; }
+  #chatHeader { background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(24,28,60,.05); z-index: 2; position: relative; }
   #chatHeader .bot-toggle { margin-inline-start: auto; font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; color: var(--muted); }
   .chip { background: #eef0f7; color: #4b5163; border: 1px solid #dde0ec; border-radius: 20px; padding: 4px 13px; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .12s; }
   .chip:hover { border-color: var(--navy-3); color: var(--navy); }
@@ -113,6 +113,24 @@
   .day-sep { text-align: center; margin: 12px 0 6px; }
   .day-sep span { background: var(--field); color: var(--muted); font-size: 12px; padding: 4px 14px; border-radius: 12px; border: 1px solid var(--border); }
   .msg a { color: var(--info); word-break: break-all; }
+  .msg { position: relative; }
+  .msg-reply { position: absolute; top: 4px; inset-inline-end: 4px; opacity: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; padding: 2px 7px; transition: opacity .15s; }
+  .msg:hover .msg-reply { opacity: 1; }
+  .quoted { border-inline-start: 3px solid var(--gold, #c9a44a); background: rgba(0,0,0,.06); border-radius: 6px; padding: 5px 9px; margin-bottom: 6px; font-size: 12.5px; max-width: 280px; cursor: pointer; }
+  .quoted .qwho { font-weight: 700; color: var(--navy-3, #2e3873); font-size: 12px; }
+  .quoted .qbody { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #quoteBar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: var(--card); border-top: 1px solid var(--border); }
+  #quoteBar .qbox { flex: 1; border-inline-start: 3px solid var(--gold, #c9a44a); background: var(--field); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; }
+  .convo-lbls { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .convo-lbls span, #convoLabels span { background: var(--field); border: 1px solid var(--border); color: var(--navy-3, #2e3873); border-radius: 10px; padding: 1px 9px; font-size: 11px; font-weight: 600; }
+  #convoLabels { display: flex; gap: 4px; flex-wrap: wrap; }
+  #labelsMenu { position: absolute; top: 46px; inset-inline-start: 60px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.2); padding: 10px; z-index: 40; display: flex; gap: 8px; }
+  #labelsMenu input { background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; font-family: inherit; width: 210px; }
+  #chatSearchWrap { display: flex; align-items: center; gap: 8px; }
+  #chatSearchIn { background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 6px 12px; color: var(--text); font-size: 13px; outline: none; font-family: inherit; width: 180px; }
+  #recBar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--card); border-top: 1px solid var(--border); font-size: 14px; }
+  .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #e0245e; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
   #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15.5px; }
 
   /* ===== الصفحات الإدارية ===== */
@@ -363,6 +381,17 @@
     <div id="empty">اختر محادثة من القائمة</div>
     <div id="chatHeader" hidden>
       <span id="chatTitle"></span>
+      <span id="convoLabels"></span>
+      <button id="labelsBtn" class="btn secondary" style="padding:2px 8px;font-size:12px;margin:0" title="وسوم المحادثة">🏷</button>
+      <button id="chatSearchBtn" class="btn secondary" style="padding:2px 8px;font-size:12px;margin:0" title="بحث في المحادثة">🔍</button>
+      <span id="chatSearchWrap" hidden>
+        <input id="chatSearchIn" placeholder="بحث في المحادثة..." />
+        <span id="chatSearchCount" style="font-size:12px;color:var(--muted)"></span>
+      </span>
+      <div id="labelsMenu" hidden>
+        <input id="labelsIn" placeholder="وسوم مفصولة بمسافات (مثال: مهم عضوية)" />
+        <button id="labelsSave" class="btn secondary" style="padding:6px 14px;font-size:12.5px;margin:0">حفظ</button>
+      </div>
       <button id="contactPanelBtn" class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0">👤 البيانات</button>
       <button id="convoStatusBtn" class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0"></button>
       <span id="assignArea" style="font-size:12px;color:#8696a0;display:flex;align-items:center;gap:6px"></span>
@@ -394,9 +423,18 @@
       </div>
     </div>
     <div id="messages" hidden></div>
+    <div id="quoteBar" hidden></div>
     <div id="attachBar" hidden></div>
+    <div id="recBar" hidden>
+      <span class="rec-dot"></span>
+      <span id="recTime">0:00</span>
+      <span style="color:var(--muted);font-size:12.5px">جارٍ التسجيل...</span>
+      <button type="button" id="recCancel" class="btn secondary" style="padding:6px 14px;font-size:12.5px;margin:0">إلغاء</button>
+      <button type="button" id="recSend" class="btn" style="padding:6px 18px;font-size:13px;margin:0">إرسال ➤</button>
+    </div>
     <form id="composer" hidden>
       <button type="button" id="attachBtn" title="إرفاق صورة أو ملف" style="padding:11px 13px">📎</button>
+      <button type="button" id="micBtn" title="تسجيل رسالة صوتية" style="padding:11px 13px">🎤</button>
       <input type="file" id="attachFile" hidden />
       <div id="attachMenu" hidden>
         <button type="button" id="attachDevice">📷 صورة أو ملف من الجهاز</button>
@@ -532,7 +570,7 @@
       <textarea id="conImport" dir="ltr" rows="4" placeholder="9665xxxxxxxx,أحمد محمد,vip"></textarea>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn" id="conImportBtn">استيراد</button>
-        <label class="btn secondary" style="padding:10px 18px;font-size:13px;margin:0;cursor:pointer">رفع ملف CSV<input type="file" id="conFile" accept=".csv,.txt" hidden /></label>
+        <label class="btn secondary" style="padding:10px 18px;font-size:13px;margin:0;cursor:pointer">رفع ملف CSV/Excel<input type="file" id="conFile" accept=".csv,.txt,.xlsx,.xls" hidden /></label>
       </div>
       <div class="hint">الرقم بالصيغة الدولية بدون +. الرقم الموجود مسبقًا يتحدّث اسمه وأقسامه. كل رقم يرسل رسالة لصندوق الوارد يتسجّل تلقائيًا.</div>
     </div>
@@ -689,7 +727,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', 
 
 // ===== i18n =====
 let LANG = localStorage.getItem('lang') || 'ar';
-const I18N = {"تسجيل الدخول": "Sign in", "اسم المستخدم": "Username", "كلمة السر": "Password", "دخول": "Sign in", "منصة واتساب للأعمال": "WhatsApp Business Platform", "💬 منصة واتساب": "WhatsApp Platform", "المحادثات": "Inbox", "القوالب": "Templates", "الحملات": "Campaigns", "جهات الاتصال": "Contacts", "الموظفون": "Team", "التقارير": "Reports", "البوت": "Bot", "خروج": "Log out", "الكل": "All", "غير مقروءة": "Unread", "مسندة إليّ": "Mine", "غير مسندة": "Unassigned", "المغلقة": "Closed", "🔍 بحث بالاسم أو الرقم...": "🔍 Search by name or number...", "اختر محادثة من القائمة": "Pick a conversation from the list", "👤 البيانات": "👤 Details", "🤖 البوت": "🤖 Bot", "الاسم": "Name", "الوسوم (كلمات مفصولة بمسافات)": "Tags (space-separated words)", "ملاحظات عامة عن جهة الاتصال": "General notes about this contact", "حفظ البيانات": "Save details", "تم الحفظ ✓": "Saved ✓", "ملاحظات الفريق على المحادثة (داخلية، لا تصل للعميل)": "Team notes on this conversation (internal, never sent to the customer)", "أضف ملاحظة داخلية...": "Add an internal note...", "إضافة": "Add", "نص فقط": "Text only", "صورة": "Image", "مستند": "Document", "فيديو": "Video", "صوت": "Audio", "رابط ميديا https:// (اختياري)": "Media URL https:// (optional)", "اكتب رسالة... (الرد اليدوي يوقف البوت عن هذه المحادثة)": "Type a message... (a manual reply pauses the bot on this conversation)", "إرسال": "Send", "نوع الميديا": "Media type", "رد جاهز": "Canned reply", "⚡ رد جاهز": "⚡ Canned reply", "قوالب الرسائل": "Message templates", "إنشاء قالب جديد": "Create a new template", "الاسم (إنجليزي صغير بدون مسافات، مثل welcome_offer)": "Name (lowercase English, no spaces, e.g. welcome_offer)", "الفئة": "Category", "تسويق (MARKETING)": "Marketing (MARKETING)", "خدمة (UTILITY)": "Utility (UTILITY)", "توثيق (AUTHENTICATION)": "Authentication (AUTHENTICATION)", "اللغة": "Language", "العربية (ar)": "Arabic (ar)", "الإنجليزية (en_US)": "English (en_US)", "نص الرسالة (للمتغيرات استخدم {{1}} {{2}} ...)": "Message body (use {{1}} {{2}} ... for variables)", "أمثلة المتغيرات بالترتيب، مفصولة بـ | (مطلوبة لو النص فيه متغيرات)": "Variable examples in order, separated by | (required if the body has variables)", "الهيدر (اختياري)": "Header (optional)", "بدون": "None", "نص": "Text", "الفوتر (اختياري)": "Footer (optional)", "الأزرار (اختياري، حتى 3)": "Buttons (optional, up to 3)", "رد سريع": "Quick reply", "رابط": "URL", "اتصال": "Call", "نص الزر": "Button label", "الرابط أو رقم الهاتف": "URL or phone number", "تقديم القالب للمراجعة": "Submit template for review", "ميتا تراجع القالب قبل اعتماده (عادة من دقائق لساعات). الحملات ترسل بالقوالب المعتمدة فقط.": "Meta reviews the template before approval (usually minutes to hours). Campaigns send approved templates only.", "القوالب الحالية": "Current templates", "تحديث": "Refresh", "النص": "Body", "الحالة": "Status", "مثال: مرحبًا {{1}}! عرض خاص لك على {{2}} هذا الأسبوع...": "e.g. Hi {{1}}! A special offer on {{2}} this week...", "أحمد | دورة التصميم": "Ahmed | design course", "نص الهيدر": "Header text", "مثال: أكاديمية غرفة جازان": "e.g. Jazan Chamber Academy", "الحملات الجماعية": "Bulk campaigns", "حملة جديدة": "New campaign", "اسم الحملة": "Campaign name", "القالب المعتمد": "Approved template", "— حمّل القوالب أولًا —": "— Load templates first —", "الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)": "Numbers (one per line or comma-separated, international format without +, e.g. 9665xxxxxxxx)", "أو أضف قسمًا من جهات الاتصال (تاج، اختياري)": "Or add a contact segment (tag, optional)", "مثال: vip": "e.g. vip", "هيدر ميديا للقالب (رابط صورة/مستند https، اختياري — فقط لو القالب له هيدر ميديا)": "Template media header (image/document https URL, optional — only if the template has a media header)", "جدولة الإرسال لوقت لاحق (اختياري)": "Schedule sending for later (optional)", "إنشاء وبدء الإرسال": "Create and start sending", "الإرسال برسالة كل ثانية تقريبًا. القالب يرسل كما هو لكل رقم؛ تجنّب الإزعاج عشان رقمك ما يتبلّغش. من ألغى اشتراكه لا تصله الحملة. لو حددت وقت جدولة، الحملة تبدأ لوحدها في الموعد.": "Sends roughly one message per second. The template goes as-is to every number; avoid spam so your number doesn't get reported. Opted-out contacts are skipped. If you set a schedule time, the campaign starts on its own.", "الإجمالي": "Total", "ناجح": "Sent", "فاشل": "Failed", "الموعد": "Schedule", "↻ إعادة إرسال الفاشل": "↻ Resend failed", "الرقم": "Number", "ملاحظة": "Note", "استيراد جهات اتصال": "Import contacts", "سطر لكل جهة: الرقم، الاسم (اختياري)، الأقسام/التاجات (اختياري)": "One line per contact: number, name (optional), segments/tags (optional)", "9665xxxxxxxx,أحمد محمد,vip": "9665xxxxxxxx,Ahmed Ali,vip", "استيراد": "Import", "رفع ملف CSV": "Upload CSV file", "الرقم بالصيغة الدولية بدون +. الرقم الموجود مسبقًا يتحدّث اسمه وأقسامه. كل رقم يرسل رسالة لصندوق الوارد يتسجّل تلقائيًا.": "Number in international format without +. An existing number gets its name and segments updated. Any number that messages the inbox is registered automatically.", "القائمة": "List", "تصدير CSV": "Export CSV", "الأقسام": "Segments", "يستلم الحملات": "Receives campaigns", "ألغِ التحديد لإيقاف الحملات عن رقم دون حذفه. أي رسالة واردة تحتوي \"إيقاف\" أو \"stop\" تلغي الاشتراك تلقائيًا.": "Uncheck to stop campaigns to a number without deleting it. Any inbound message containing \"stop\" unsubscribes automatically.", "حالة الاتصال بميتا (Webhook)": "Meta connection status (Webhook)", "الرسائل آخر 14 يوم": "Messages, last 14 days", "أنشط المحادثات": "Most active conversations", "الوقت": "Time", "النوع": "Type", "التفاصيل": "Details", "اليوم": "Today", "واردة": "Inbound", "صادرة": "Outbound", "عدد الرسائل": "Messages", "الـ API الخارجي": "External API", "إنشاء مفتاح جديد": "Create a new key", "اسم النظام المستخدم للمفتاح": "Name of the system using this key", "مثال: نظام العضويات": "e.g. membership system", "إنشاء": "Create", "المفتاح يظهر مرة واحدة هنا فقط — انسخه فورًا. الاستخدام: POST إلى": "The key is shown once, here only — copy it now. Usage: POST to", "مع هيدر": "with header", "وجسم": "and body", "أو": "or", "المفاتيح": "Keys", "أنشئ": "Created", "آخر استخدام": "Last used", "إضافة موظف": "Add team member", "اسم المستخدم (إنجليزي بدون مسافات)": "Username (English, no spaces)", "كلمة السر (6 أحرف على الأقل)": "Password (at least 6 characters)", "الدور": "Role", "موظف": "Agent", "مدير": "Admin", "المستخدم": "Username", "نشط": "Active", "الرد الآلي (البوت)": "Auto-reply (Bot)", "البوت مفعّل على كل المحادثات": "Bot enabled on all conversations", "رسالة الترحيب لأول محادثة": "Welcome message for the first conversation", "إرسال رسالة ترحيب تلقائية عند أول رسالة من عميل جديد": "Send an automatic welcome message on a new customer's first message", "حفظ": "Save", "إضافة قاعدة": "Add a rule", "رد مباشر": "Direct reply", "قائمة خيارات مرقّمة": "Numbered options menu", "لو الرسالة تحتوي على (اكتب * للرد على أي رسالة)": "If the message contains (type * to reply to any message)", "مثال: السعر": "e.g. price", "يرد بـ": "Reply with", "مثال: أسعارنا تبدأ من...": "e.g. Our prices start at...", "خيارات القائمة (سطر لكل خيار: رقم | العنوان | الرد)": "Menu options (one line per option: number | label | reply)", "1 | الاشتراكات | تفاصيل الاشتراكات...\n2 | الفعاليات | تفاصيل الفعاليات...": "1 | Memberships | membership details...\n2 | Events | event details...", "إضافة القاعدة": "Add rule", "أول قاعدة تطابق هي اللي بتتنفذ. في القائمة المرقّمة: العميل يرد برقم الخيار فيصله رده. الرد اليدوي من صندوق الوارد يوقف البوت عن المحادثة دي تلقائيًا حتى تعيد تفعيله من رأس المحادثة.": "The first matching rule runs. In a numbered menu, the customer replies with the option number and gets its reply. A manual reply from the inbox pauses the bot on that conversation until you re-enable it from the conversation header.", "القواعد الحالية": "Current rules", "الكلمة المفتاحية": "Keyword", "الرد": "Reply", "الردود الجاهزة (تظهر كاختصار ⚡ في صندوق الرد بالوارد)": "Canned replies (show as the ⚡ shortcut in the inbox reply box)", "العنوان": "Title", "مثال: ترحيب": "e.g. Welcome", "الرد خارج أوقات العمل": "After-hours reply", "تفعيل الرد التلقائي خارج الدوام": "Enable the automatic after-hours reply", "ساعات العمل (بتوقيت السعودية)": "Working hours (Saudi time)", "إلى": "to", "أيام العمل (0=الأحد … 6=السبت، مفصولة بفواصل)": "Working days (0=Sunday … 6=Saturday, comma-separated)", "نص الرد": "Reply text", "حفظ الإعدادات": "Save settings", "يرد مرة واحدة كل 12 ساعة على كل محادثة خارج أوقات العمل، ويتجاوز قواعد البوت الأخرى في تلك الرسالة.": "Replies once every 12 hours per conversation outside working hours, overriding other bot rules for that message.", "القالب": "Template", " (مدير)": " (Admin)", "متصل بميتا": "Connected to Meta", "بيانات ميتا ناقصة": "Meta credentials missing", "صندوق الوارد": "Inbox", "لا محادثات مطابقة": "No matching conversations", "↩️ إعادة فتح المحادثة": "↩️ Reopen conversation", "✔️ إغلاق المحادثة": "✔️ Close conversation", "إعادة تفعيل استقبال الحملات": "Re-enable campaign delivery", "إيقاف الحملات عنه (opt-out)": "Stop campaigns to this contact (opt-out)", "لا ملاحظات بعد": "No notes yet", "فشل الإرسال: ": "Sending failed: ", "مستند مرفق": "Attached document", "🤖 بوت": "🤖 Bot", "لا توجد قوالب بعد": "No templates yet", "تم تقديم القالب لمراجعة ميتا": "Template submitted for Meta review", "تجربة": "Test", "حذف": "Delete", "حذف القالب": "Delete template", "نهائيًا من حساب واتساب؟": "permanently from the WhatsApp account?", "إرسال القالب": "Send template", "تجريبيًا إلى رقم (بالصيغة الدولية بدون +):": "as a test to a number (international format without +):", "تم الإرسال ✓": "Sent ✓", "لا توجد قوالب معتمدة بعد": "No approved templates yet", "قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)": "Variable values in order (one sent per number)", "قيمة": "Value", "لا توجد حملات بعد": "No campaigns yet", "مستلمو حملة": "Campaign recipients", "أُعيد إرسال": "Resent", "رسالة فاشلة": "failed message(s)", "لا توجد رسائل فاشلة": "No failed messages", "اتجدولت الحملة لـ": "Campaign scheduled for", "بدأت الحملة لـ": "Campaign started for", "رقم": "number(s)", "لا توجد جهات اتصال بعد": "No contacts yet", "تم استيراد/تحديث": "Imported/updated", "جهة اتصال": "contact(s)", "📋 قائمة": "📋 Menu", "💬 رد": "💬 Reply", "لا توجد قواعد بعد": "No rules yet", "نص يظهر فوق الخيارات": "Text shown above the options", "تم حفظ إعدادات خارج الدوام": "After-hours settings saved", "رسائل واردة": "Inbound messages", "رسائل صادرة": "Outbound messages", "ردود البوت": "Bot replies", "ألغوا الاشتراك": "Opted out", "حملات": "Campaigns", "رسائل حملات ناجحة": "Successful campaign messages", "فاشلة": "Failed", "لا رسائل بعد": "No messages yet", "✓ الـ Webhook يستلم — آخر رسالة واردة: ": "✓ Webhook receiving — last inbound message: ", "⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.": "⚠ No webhook messages received yet. Make sure the Callback URL is connected in the Meta dashboard.", "رسالة": "Message", "حالة": "Status", "لا أحداث بعد": "No events yet", "لم يستخدم": "Never used", "لا مفاتيح بعد": "No API keys yet", "المفتاح (يظهر مرة واحدة): ": "Key (shown once): ", "لا ردود جاهزة بعد": "No canned replies yet", "العنوان والنص مطلوبان": "Title and body are required", "تم حفظ رسالة الترحيب": "Welcome message saved", "📌 غير مسندة": "📌 Unassigned", "فك الإسناد": "Unassign", "إسناد إليّ": "Assign to me", "كل الأقسام": "All departments", "إعادة تسمية القسم": "Rename department", "اسم القسم الجديد:": "New department name:", "لوحة التحكم": "Dashboard", "إدارة واتساب": "Manage WhatsApp", "التواصل": "Communication", "النظام": "System", "الملف التجاري": "Business profile", "قوالب الرسائل": "Message templates", "إرسال سريع": "Quick send", "المحظورون": "Blocked contacts", "ملخص الاستهلاك": "Usage summary", "المحادثات المباشرة": "Live chat", "إدارة البوت": "ChatBot management", "سجل الاتصال (Webhook)": "Connection log (Webhook)", "سجل الاتصال": "Connection log", "المطورون (API)": "Developers (API)", "واردة اليوم": "Inbound today", "صادرة اليوم": "Outbound today", "ردود البوت اليوم": "Bot replies today", "محادثات مفتوحة": "Open conversations", "أداء الحملات": "Campaign performance", "حالة الحساب": "Account status", "لا بيانات بعد": "No data yet", "الحملة": "Campaign", "أُرسلت": "Sent", "وصلت": "Delivered", "قُرئت": "Read", "التفاعل %": "Engagement %", "بيانات النشاط الظاهرة للعملاء": "Business info shown to customers", "يظهر هذا الملف للعملاء في صفحة حسابك على واتساب.": "This profile is shown to customers on your WhatsApp account page.", "الرقم (القسم)": "Number (department)", "من الرقم (القسم)": "From number (department)", "نبذة (حتى 139 حرف)": "About (up to 139 chars)", "الوصف (حتى 512 حرف)": "Description (up to 512 chars)", "البريد الإلكتروني": "Email", "العنوان": "Address", "المواقع الإلكترونية (حتى 2، مفصولة بفاصلة)": "Websites (up to 2, comma-separated)", "مجال النشاط": "Business category", "حفظ الملف": "Save profile", "تحميل الملف": "Load profile", "تم حفظ الملف التجاري ✓": "Business profile saved ✓", "تعذر تحميل الملف من ميتا": "Could not load the profile from Meta", "أخرى": "Other", "غير ربحي": "Non-profit", "حكومي": "Government", "تعليم": "Education", "خدمات احترافية": "Professional services", "خدمات مالية": "Financial services", "صحة": "Health", "تجزئة": "Retail", "مطاعم": "Restaurants", "سفر وسياحة": "Travel", "فعاليات": "Events", "قالب لأرقام محددة فورًا": "Template to specific numbers now", "إرسال قالب معتمد لقائمة أرقام قصيرة (حتى 100) فورًا، بدون إنشاء حملة.": "Send an approved template to a short list (up to 100) right away, without creating a campaign.", "القالب وقائمة الأرقام مطلوبة": "Template and number list are required", "بدأ الإرسال السريع لـ": "Quick send started for", "المحظورون (ألغوا الاشتراك)": "Blocked (opted out)", "لا محظورين": "No blocked contacts", "إلغاء الحظر": "Unblock", "أي رسالة واردة فيها \"إيقاف\" أو \"stop\" تحظر الرقم تلقائيًا من الحملات.": "Any inbound message containing \"stop\" blocks the number from campaigns automatically.", "الفترات": "Periods", "الفترة": "Period", "آخر 7 أيام": "Last 7 days", "آخر 30 يوم": "Last 30 days", "التوزيع على الأرقام": "Per-number breakdown", "القسم": "Department", "المحادثات": "Conversations", "نشطة": "Live", "مجدولة": "Scheduled", "مكتملة": "Sent", "مسودات": "Drafts", "تحويل لموظف": "Handoff to staff", "📞 تحويل": "📞 Handoff", "تصدير CSV": "Export CSV", "تصدير الحملات CSV": "Export campaigns CSV", "طباعة / حفظ PDF": "Print / Save PDF", "إشعارات المتصفح مفعّلة": "Browser notifications on", "إرفاق صورة أو ملف": "Attach an image or file", "📷 صورة أو ملف من الجهاز": "📷 Image or file from device", "🔗 رابط ميديا (https)": "🔗 Media link (https)", "الصق رابط الميديا (https://...)": "Paste the media link (https://...)", "جارٍ الإرسال...": "Sending...", "الرابط لازم يبدأ بـ https://": "The link must start with https://", "الملف أكبر من 16MB": "File is larger than 16MB", "أمس": "Yesterday", "ملصق": "Sticker", "تفعيل إشعارات الرسائل الجديدة": "Enable new-message notifications", "محادثة جديدة": "New conversation", "رسالة جديدة من": "New message from", "قاعدة \"تحويل لموظف\" توقف البوت عن المحادثة ليتولاها الفريق (الرد اختياري).": "A \"handoff\" rule pauses the bot on the conversation so the team takes over (reply optional)."};
+const I18N = {"تسجيل الدخول": "Sign in", "اسم المستخدم": "Username", "كلمة السر": "Password", "دخول": "Sign in", "منصة واتساب للأعمال": "WhatsApp Business Platform", "💬 منصة واتساب": "WhatsApp Platform", "المحادثات": "Inbox", "القوالب": "Templates", "الحملات": "Campaigns", "جهات الاتصال": "Contacts", "الموظفون": "Team", "التقارير": "Reports", "البوت": "Bot", "خروج": "Log out", "الكل": "All", "غير مقروءة": "Unread", "مسندة إليّ": "Mine", "غير مسندة": "Unassigned", "المغلقة": "Closed", "🔍 بحث بالاسم أو الرقم...": "🔍 Search by name or number...", "اختر محادثة من القائمة": "Pick a conversation from the list", "👤 البيانات": "👤 Details", "🤖 البوت": "🤖 Bot", "الاسم": "Name", "الوسوم (كلمات مفصولة بمسافات)": "Tags (space-separated words)", "ملاحظات عامة عن جهة الاتصال": "General notes about this contact", "حفظ البيانات": "Save details", "تم الحفظ ✓": "Saved ✓", "ملاحظات الفريق على المحادثة (داخلية، لا تصل للعميل)": "Team notes on this conversation (internal, never sent to the customer)", "أضف ملاحظة داخلية...": "Add an internal note...", "إضافة": "Add", "نص فقط": "Text only", "صورة": "Image", "مستند": "Document", "فيديو": "Video", "صوت": "Audio", "رابط ميديا https:// (اختياري)": "Media URL https:// (optional)", "اكتب رسالة... (الرد اليدوي يوقف البوت عن هذه المحادثة)": "Type a message... (a manual reply pauses the bot on this conversation)", "إرسال": "Send", "نوع الميديا": "Media type", "رد جاهز": "Canned reply", "⚡ رد جاهز": "⚡ Canned reply", "قوالب الرسائل": "Message templates", "إنشاء قالب جديد": "Create a new template", "الاسم (إنجليزي صغير بدون مسافات، مثل welcome_offer)": "Name (lowercase English, no spaces, e.g. welcome_offer)", "الفئة": "Category", "تسويق (MARKETING)": "Marketing (MARKETING)", "خدمة (UTILITY)": "Utility (UTILITY)", "توثيق (AUTHENTICATION)": "Authentication (AUTHENTICATION)", "اللغة": "Language", "العربية (ar)": "Arabic (ar)", "الإنجليزية (en_US)": "English (en_US)", "نص الرسالة (للمتغيرات استخدم {{1}} {{2}} ...)": "Message body (use {{1}} {{2}} ... for variables)", "أمثلة المتغيرات بالترتيب، مفصولة بـ | (مطلوبة لو النص فيه متغيرات)": "Variable examples in order, separated by | (required if the body has variables)", "الهيدر (اختياري)": "Header (optional)", "بدون": "None", "نص": "Text", "الفوتر (اختياري)": "Footer (optional)", "الأزرار (اختياري، حتى 3)": "Buttons (optional, up to 3)", "رد سريع": "Quick reply", "رابط": "URL", "اتصال": "Call", "نص الزر": "Button label", "الرابط أو رقم الهاتف": "URL or phone number", "تقديم القالب للمراجعة": "Submit template for review", "ميتا تراجع القالب قبل اعتماده (عادة من دقائق لساعات). الحملات ترسل بالقوالب المعتمدة فقط.": "Meta reviews the template before approval (usually minutes to hours). Campaigns send approved templates only.", "القوالب الحالية": "Current templates", "تحديث": "Refresh", "النص": "Body", "الحالة": "Status", "مثال: مرحبًا {{1}}! عرض خاص لك على {{2}} هذا الأسبوع...": "e.g. Hi {{1}}! A special offer on {{2}} this week...", "أحمد | دورة التصميم": "Ahmed | design course", "نص الهيدر": "Header text", "مثال: أكاديمية غرفة جازان": "e.g. Jazan Chamber Academy", "الحملات الجماعية": "Bulk campaigns", "حملة جديدة": "New campaign", "اسم الحملة": "Campaign name", "القالب المعتمد": "Approved template", "— حمّل القوالب أولًا —": "— Load templates first —", "الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)": "Numbers (one per line or comma-separated, international format without +, e.g. 9665xxxxxxxx)", "أو أضف قسمًا من جهات الاتصال (تاج، اختياري)": "Or add a contact segment (tag, optional)", "مثال: vip": "e.g. vip", "هيدر ميديا للقالب (رابط صورة/مستند https، اختياري — فقط لو القالب له هيدر ميديا)": "Template media header (image/document https URL, optional — only if the template has a media header)", "جدولة الإرسال لوقت لاحق (اختياري)": "Schedule sending for later (optional)", "إنشاء وبدء الإرسال": "Create and start sending", "الإرسال برسالة كل ثانية تقريبًا. القالب يرسل كما هو لكل رقم؛ تجنّب الإزعاج عشان رقمك ما يتبلّغش. من ألغى اشتراكه لا تصله الحملة. لو حددت وقت جدولة، الحملة تبدأ لوحدها في الموعد.": "Sends roughly one message per second. The template goes as-is to every number; avoid spam so your number doesn't get reported. Opted-out contacts are skipped. If you set a schedule time, the campaign starts on its own.", "الإجمالي": "Total", "ناجح": "Sent", "فاشل": "Failed", "الموعد": "Schedule", "↻ إعادة إرسال الفاشل": "↻ Resend failed", "الرقم": "Number", "ملاحظة": "Note", "استيراد جهات اتصال": "Import contacts", "سطر لكل جهة: الرقم، الاسم (اختياري)، الأقسام/التاجات (اختياري)": "One line per contact: number, name (optional), segments/tags (optional)", "9665xxxxxxxx,أحمد محمد,vip": "9665xxxxxxxx,Ahmed Ali,vip", "استيراد": "Import", "رفع ملف CSV": "Upload CSV file", "الرقم بالصيغة الدولية بدون +. الرقم الموجود مسبقًا يتحدّث اسمه وأقسامه. كل رقم يرسل رسالة لصندوق الوارد يتسجّل تلقائيًا.": "Number in international format without +. An existing number gets its name and segments updated. Any number that messages the inbox is registered automatically.", "القائمة": "List", "تصدير CSV": "Export CSV", "الأقسام": "Segments", "يستلم الحملات": "Receives campaigns", "ألغِ التحديد لإيقاف الحملات عن رقم دون حذفه. أي رسالة واردة تحتوي \"إيقاف\" أو \"stop\" تلغي الاشتراك تلقائيًا.": "Uncheck to stop campaigns to a number without deleting it. Any inbound message containing \"stop\" unsubscribes automatically.", "حالة الاتصال بميتا (Webhook)": "Meta connection status (Webhook)", "الرسائل آخر 14 يوم": "Messages, last 14 days", "أنشط المحادثات": "Most active conversations", "الوقت": "Time", "النوع": "Type", "التفاصيل": "Details", "اليوم": "Today", "واردة": "Inbound", "صادرة": "Outbound", "عدد الرسائل": "Messages", "الـ API الخارجي": "External API", "إنشاء مفتاح جديد": "Create a new key", "اسم النظام المستخدم للمفتاح": "Name of the system using this key", "مثال: نظام العضويات": "e.g. membership system", "إنشاء": "Create", "المفتاح يظهر مرة واحدة هنا فقط — انسخه فورًا. الاستخدام: POST إلى": "The key is shown once, here only — copy it now. Usage: POST to", "مع هيدر": "with header", "وجسم": "and body", "أو": "or", "المفاتيح": "Keys", "أنشئ": "Created", "آخر استخدام": "Last used", "إضافة موظف": "Add team member", "اسم المستخدم (إنجليزي بدون مسافات)": "Username (English, no spaces)", "كلمة السر (6 أحرف على الأقل)": "Password (at least 6 characters)", "الدور": "Role", "موظف": "Agent", "مدير": "Admin", "المستخدم": "Username", "نشط": "Active", "الرد الآلي (البوت)": "Auto-reply (Bot)", "البوت مفعّل على كل المحادثات": "Bot enabled on all conversations", "رسالة الترحيب لأول محادثة": "Welcome message for the first conversation", "إرسال رسالة ترحيب تلقائية عند أول رسالة من عميل جديد": "Send an automatic welcome message on a new customer's first message", "حفظ": "Save", "إضافة قاعدة": "Add a rule", "رد مباشر": "Direct reply", "قائمة خيارات مرقّمة": "Numbered options menu", "لو الرسالة تحتوي على (اكتب * للرد على أي رسالة)": "If the message contains (type * to reply to any message)", "مثال: السعر": "e.g. price", "يرد بـ": "Reply with", "مثال: أسعارنا تبدأ من...": "e.g. Our prices start at...", "خيارات القائمة (سطر لكل خيار: رقم | العنوان | الرد)": "Menu options (one line per option: number | label | reply)", "1 | الاشتراكات | تفاصيل الاشتراكات...\n2 | الفعاليات | تفاصيل الفعاليات...": "1 | Memberships | membership details...\n2 | Events | event details...", "إضافة القاعدة": "Add rule", "أول قاعدة تطابق هي اللي بتتنفذ. في القائمة المرقّمة: العميل يرد برقم الخيار فيصله رده. الرد اليدوي من صندوق الوارد يوقف البوت عن المحادثة دي تلقائيًا حتى تعيد تفعيله من رأس المحادثة.": "The first matching rule runs. In a numbered menu, the customer replies with the option number and gets its reply. A manual reply from the inbox pauses the bot on that conversation until you re-enable it from the conversation header.", "القواعد الحالية": "Current rules", "الكلمة المفتاحية": "Keyword", "الرد": "Reply", "الردود الجاهزة (تظهر كاختصار ⚡ في صندوق الرد بالوارد)": "Canned replies (show as the ⚡ shortcut in the inbox reply box)", "العنوان": "Title", "مثال: ترحيب": "e.g. Welcome", "الرد خارج أوقات العمل": "After-hours reply", "تفعيل الرد التلقائي خارج الدوام": "Enable the automatic after-hours reply", "ساعات العمل (بتوقيت السعودية)": "Working hours (Saudi time)", "إلى": "to", "أيام العمل (0=الأحد … 6=السبت، مفصولة بفواصل)": "Working days (0=Sunday … 6=Saturday, comma-separated)", "نص الرد": "Reply text", "حفظ الإعدادات": "Save settings", "يرد مرة واحدة كل 12 ساعة على كل محادثة خارج أوقات العمل، ويتجاوز قواعد البوت الأخرى في تلك الرسالة.": "Replies once every 12 hours per conversation outside working hours, overriding other bot rules for that message.", "القالب": "Template", " (مدير)": " (Admin)", "متصل بميتا": "Connected to Meta", "بيانات ميتا ناقصة": "Meta credentials missing", "صندوق الوارد": "Inbox", "لا محادثات مطابقة": "No matching conversations", "↩️ إعادة فتح المحادثة": "↩️ Reopen conversation", "✔️ إغلاق المحادثة": "✔️ Close conversation", "إعادة تفعيل استقبال الحملات": "Re-enable campaign delivery", "إيقاف الحملات عنه (opt-out)": "Stop campaigns to this contact (opt-out)", "لا ملاحظات بعد": "No notes yet", "فشل الإرسال: ": "Sending failed: ", "مستند مرفق": "Attached document", "🤖 بوت": "🤖 Bot", "لا توجد قوالب بعد": "No templates yet", "تم تقديم القالب لمراجعة ميتا": "Template submitted for Meta review", "تجربة": "Test", "حذف": "Delete", "حذف القالب": "Delete template", "نهائيًا من حساب واتساب؟": "permanently from the WhatsApp account?", "إرسال القالب": "Send template", "تجريبيًا إلى رقم (بالصيغة الدولية بدون +):": "as a test to a number (international format without +):", "تم الإرسال ✓": "Sent ✓", "لا توجد قوالب معتمدة بعد": "No approved templates yet", "قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)": "Variable values in order (one sent per number)", "قيمة": "Value", "لا توجد حملات بعد": "No campaigns yet", "مستلمو حملة": "Campaign recipients", "أُعيد إرسال": "Resent", "رسالة فاشلة": "failed message(s)", "لا توجد رسائل فاشلة": "No failed messages", "اتجدولت الحملة لـ": "Campaign scheduled for", "بدأت الحملة لـ": "Campaign started for", "رقم": "number(s)", "لا توجد جهات اتصال بعد": "No contacts yet", "تم استيراد/تحديث": "Imported/updated", "جهة اتصال": "contact(s)", "📋 قائمة": "📋 Menu", "💬 رد": "💬 Reply", "لا توجد قواعد بعد": "No rules yet", "نص يظهر فوق الخيارات": "Text shown above the options", "تم حفظ إعدادات خارج الدوام": "After-hours settings saved", "رسائل واردة": "Inbound messages", "رسائل صادرة": "Outbound messages", "ردود البوت": "Bot replies", "ألغوا الاشتراك": "Opted out", "حملات": "Campaigns", "رسائل حملات ناجحة": "Successful campaign messages", "فاشلة": "Failed", "لا رسائل بعد": "No messages yet", "✓ الـ Webhook يستلم — آخر رسالة واردة: ": "✓ Webhook receiving — last inbound message: ", "⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.": "⚠ No webhook messages received yet. Make sure the Callback URL is connected in the Meta dashboard.", "رسالة": "Message", "حالة": "Status", "لا أحداث بعد": "No events yet", "لم يستخدم": "Never used", "لا مفاتيح بعد": "No API keys yet", "المفتاح (يظهر مرة واحدة): ": "Key (shown once): ", "لا ردود جاهزة بعد": "No canned replies yet", "العنوان والنص مطلوبان": "Title and body are required", "تم حفظ رسالة الترحيب": "Welcome message saved", "📌 غير مسندة": "📌 Unassigned", "فك الإسناد": "Unassign", "إسناد إليّ": "Assign to me", "كل الأقسام": "All departments", "إعادة تسمية القسم": "Rename department", "اسم القسم الجديد:": "New department name:", "لوحة التحكم": "Dashboard", "إدارة واتساب": "Manage WhatsApp", "التواصل": "Communication", "النظام": "System", "الملف التجاري": "Business profile", "قوالب الرسائل": "Message templates", "إرسال سريع": "Quick send", "المحظورون": "Blocked contacts", "ملخص الاستهلاك": "Usage summary", "المحادثات المباشرة": "Live chat", "إدارة البوت": "ChatBot management", "سجل الاتصال (Webhook)": "Connection log (Webhook)", "سجل الاتصال": "Connection log", "المطورون (API)": "Developers (API)", "واردة اليوم": "Inbound today", "صادرة اليوم": "Outbound today", "ردود البوت اليوم": "Bot replies today", "محادثات مفتوحة": "Open conversations", "أداء الحملات": "Campaign performance", "حالة الحساب": "Account status", "لا بيانات بعد": "No data yet", "الحملة": "Campaign", "أُرسلت": "Sent", "وصلت": "Delivered", "قُرئت": "Read", "التفاعل %": "Engagement %", "بيانات النشاط الظاهرة للعملاء": "Business info shown to customers", "يظهر هذا الملف للعملاء في صفحة حسابك على واتساب.": "This profile is shown to customers on your WhatsApp account page.", "الرقم (القسم)": "Number (department)", "من الرقم (القسم)": "From number (department)", "نبذة (حتى 139 حرف)": "About (up to 139 chars)", "الوصف (حتى 512 حرف)": "Description (up to 512 chars)", "البريد الإلكتروني": "Email", "العنوان": "Address", "المواقع الإلكترونية (حتى 2، مفصولة بفاصلة)": "Websites (up to 2, comma-separated)", "مجال النشاط": "Business category", "حفظ الملف": "Save profile", "تحميل الملف": "Load profile", "تم حفظ الملف التجاري ✓": "Business profile saved ✓", "تعذر تحميل الملف من ميتا": "Could not load the profile from Meta", "أخرى": "Other", "غير ربحي": "Non-profit", "حكومي": "Government", "تعليم": "Education", "خدمات احترافية": "Professional services", "خدمات مالية": "Financial services", "صحة": "Health", "تجزئة": "Retail", "مطاعم": "Restaurants", "سفر وسياحة": "Travel", "فعاليات": "Events", "قالب لأرقام محددة فورًا": "Template to specific numbers now", "إرسال قالب معتمد لقائمة أرقام قصيرة (حتى 100) فورًا، بدون إنشاء حملة.": "Send an approved template to a short list (up to 100) right away, without creating a campaign.", "القالب وقائمة الأرقام مطلوبة": "Template and number list are required", "بدأ الإرسال السريع لـ": "Quick send started for", "المحظورون (ألغوا الاشتراك)": "Blocked (opted out)", "لا محظورين": "No blocked contacts", "إلغاء الحظر": "Unblock", "أي رسالة واردة فيها \"إيقاف\" أو \"stop\" تحظر الرقم تلقائيًا من الحملات.": "Any inbound message containing \"stop\" blocks the number from campaigns automatically.", "الفترات": "Periods", "الفترة": "Period", "آخر 7 أيام": "Last 7 days", "آخر 30 يوم": "Last 30 days", "التوزيع على الأرقام": "Per-number breakdown", "القسم": "Department", "المحادثات": "Conversations", "نشطة": "Live", "مجدولة": "Scheduled", "مكتملة": "Sent", "مسودات": "Drafts", "تحويل لموظف": "Handoff to staff", "📞 تحويل": "📞 Handoff", "تصدير CSV": "Export CSV", "تصدير الحملات CSV": "Export campaigns CSV", "طباعة / حفظ PDF": "Print / Save PDF", "إشعارات المتصفح مفعّلة": "Browser notifications on", "إرفاق صورة أو ملف": "Attach an image or file", "📷 صورة أو ملف من الجهاز": "📷 Image or file from device", "🔗 رابط ميديا (https)": "🔗 Media link (https)", "الصق رابط الميديا (https://...)": "Paste the media link (https://...)", "جارٍ الإرسال...": "Sending...", "الرابط لازم يبدأ بـ https://": "The link must start with https://", "الملف أكبر من 16MB": "File is larger than 16MB", "أمس": "Yesterday", "ملصق": "Sticker", "أنت": "You", "رد عليها": "Reply to it", "وسوم المحادثة": "Conversation labels", "بحث في المحادثة": "Search in conversation", "بحث في المحادثة...": "Search in conversation...", "وسوم مفصولة بمسافات (مثال: مهم عضوية)": "Space-separated labels (e.g. vip membership)", "تسجيل رسالة صوتية": "Record a voice note", "جارٍ التسجيل...": "Recording...", "إلغاء": "Cancel", "إرسال ➤": "Send ➤", "الميكروفون غير متاح — اسمح بالوصول من إعدادات المتصفح": "Microphone unavailable — allow access in the browser settings", "رفع ملف CSV/Excel": "Upload CSV/Excel file", "تعذر قراءة ملف الإكسل — احفظه كـ CSV وجرب تاني": "Could not read the Excel file — save it as CSV and try again", "تفعيل إشعارات الرسائل الجديدة": "Enable new-message notifications", "محادثة جديدة": "New conversation", "رسالة جديدة من": "New message from", "قاعدة \"تحويل لموظف\" توقف البوت عن المحادثة ليتولاها الفريق (الرد اختياري).": "A \"handoff\" rule pauses the bot on the conversation so the team takes over (reply optional)."};
 const STATUS_LABELS = {
   APPROVED: ['معتمد', 'Approved'], PENDING: ['قيد المراجعة', 'Pending'], REJECTED: ['مرفوض', 'Rejected'],
   draft: ['مسودة', 'Draft'], scheduled: ['مجدولة', 'Scheduled'], running: ['قيد الإرسال', 'Running'],
@@ -843,6 +881,7 @@ const previewText = (s2) => {
   const mm = /^\[(.+)\]$/.exec(s2 || '');
   return mm ? (MEDIA_LABELS()[mm[1]] ?? s2) : s2;
 };
+const msgLabel = (t) => MEDIA_LABELS()[t] ?? ('[' + t + ']');
 
 // التبويبات
 document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
@@ -1132,7 +1171,7 @@ function renderConvos() {
     if (convoFilter === 'unassigned' && (c.assigned_to || c.status === 'closed')) return false;
     if (convoFilter === 'closed' && c.status !== 'closed') return false;
     if (deptFilter !== 'all' && (c.phone_number_id ?? defaultPnId) !== deptFilter) return false;
-    if (q && !(c.name || '').includes(q) && !c.wa_id.includes(q) && !(c.last_message || '').includes(q)) return false;
+    if (q && !(c.name || '').includes(q) && !c.wa_id.includes(q) && !(c.last_message || '').includes(q) && !(c.labels || '').includes(q)) return false;
     return true;
   });
   $('convos').innerHTML = '';
@@ -1142,7 +1181,7 @@ function renderConvos() {
     div.className = 'convo' + (c.wa_id === currentWaId && (c.phone_number_id ?? defaultPnId) === currentPn ? ' active' : '');
     div.innerHTML = `
       <div class="name"><span>${c.status === 'closed' ? '🔒 ' : ''}${esc(c.name || c.wa_id)}</span>${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
-      <div class="preview">${esc(previewText(c.last_message || ''))}</div>${dl ? `<div class="dept-tag">${esc(dl)}</div>` : ''}`;
+      <div class="preview">${esc(previewText(c.last_message || ''))}</div>${dl ? `<div class="dept-tag">${esc(dl)}</div>` : ''}${(c.labels || '').trim() ? `<div class="convo-lbls">${c.labels.trim().split(/\s+/).filter(Boolean).map((l) => `<span>${esc(l)}</span>`).join('')}</div>` : ''}`;
     div.onclick = () => openConvo(c);
     $('convos').appendChild(div);
   }
@@ -1159,6 +1198,13 @@ $('convoSearch').oninput = () => renderConvos();
 async function openConvo(c) {
   currentWaId = c.wa_id;
   currentPn = c.phone_number_id ?? defaultPnId;
+  currentConvo = c;
+  clearQuote();
+  clearAttach();
+  $('chatSearchWrap').hidden = true;
+  $('chatSearchIn').value = '';
+  filterChatMsgs('');
+  renderConvoLabels(c.labels);
   $('empty').hidden = true;
   $('chatHeader').hidden = $('messages').hidden = $('composer').hidden = false;
   $('chatTitle').textContent = (c.name || c.wa_id) + ' — ' + c.wa_id + (deptLabel(currentPn) ? ' · ' + deptLabel(currentPn) : '');
@@ -1267,7 +1313,13 @@ async function loadMessages() {
     }
     const div = document.createElement('div');
     div.className = `msg ${m.direction}`;
+    div.dataset.mid = m.id;
     let mediaHtml = '';
+    if (m.quoted_body != null || m.quoted_type) {
+      const who = m.quoted_direction === 'outbound' ? (m.quoted_sender || t9n('أنت')) : ($('chatTitle').textContent.split(' — ')[0] || '');
+      const qtext = m.quoted_body ? m.quoted_body : msgLabel(m.quoted_type);
+      mediaHtml += `<div class="quoted" data-qid="${m.quoted_wa_id}"><div class="qwho">${esc(who)}</div><div class="qbody">${esc(qtext).slice(0, 90)}</div></div>`;
+    }
     if (m.media_id) {
       const url = `/api/media/${m.id}`;
       if (m.type === 'image' || m.type === 'sticker') mediaHtml = `<a href="${url}" target="_blank"><img src="${url}" style="max-width:240px;border-radius:6px;display:block" loading="lazy" /></a>`;
@@ -1278,6 +1330,12 @@ async function loadMessages() {
       mediaHtml = `<span style="color:var(--muted)">[${m.type}]</span> `;
     }
     div.innerHTML = `${mediaHtml}${m.body ? `<div>${linkify(m.body)}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">' + t9n('🤖 بوت') + '</span> ' : ''}${m.sender ? `<span style="color:var(--purple)">${m.sender}</span> ` : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    const rb = document.createElement('button');
+    rb.className = 'msg-reply';
+    rb.textContent = '↩';
+    rb.title = t9n('رد عليها');
+    rb.onclick = () => setQuote(m);
+    div.appendChild(rb);
     $('messages').appendChild(div);
   }
   $('messages').scrollTop = $('messages').scrollHeight;
@@ -1333,6 +1391,117 @@ document.addEventListener('click', (e2) => {
   if (!$('attachMenu').hidden && !e2.target.closest('#attachMenu') && e2.target !== $('attachBtn')) $('attachMenu').hidden = true;
 });
 
+// اقتباس رسالة والرد عليها (زي السحب في واتساب)
+let pendingQuote = null;
+function setQuote(m) {
+  pendingQuote = m;
+  const who = m.direction === 'outbound' ? (m.sender || t9n('أنت')) : ($('chatTitle').textContent.split(' — ')[0] || '');
+  const qtext = m.body ? m.body : msgLabel(m.type);
+  $('quoteBar').innerHTML = `<div class="qbox"><div class="qwho" style="font-weight:700;font-size:12px;color:var(--navy-3)">${esc(who)}</div><div style="color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(qtext).slice(0, 120)}</div></div><button type="button" class="attach-x" id="quoteX">✕</button>`;
+  $('quoteBar').hidden = false;
+  $('quoteX').onclick = clearQuote;
+  $('replyInput').focus();
+}
+function clearQuote() { pendingQuote = null; $('quoteBar').hidden = true; $('quoteBar').innerHTML = ''; }
+
+// وسوم المحادثة
+let currentConvo = null;
+function renderConvoLabels(labelsStr) {
+  const lbls = String(labelsStr || '').trim().split(/\s+/).filter(Boolean);
+  $('convoLabels').innerHTML = lbls.map((l) => `<span>${esc(l)}</span>`).join('');
+}
+$('labelsBtn').onclick = () => {
+  $('labelsMenu').hidden = !$('labelsMenu').hidden;
+  if (!$('labelsMenu').hidden) { $('labelsIn').value = currentConvo?.labels || ''; $('labelsIn').focus(); }
+};
+$('labelsSave').onclick = async () => {
+  const labels = $('labelsIn').value.trim();
+  try {
+    await api(`/api/conversations/${currentWaId}/labels`, { body: { labels, pn: currentPn } });
+    if (currentConvo) currentConvo.labels = labels;
+    renderConvoLabels(labels);
+    $('labelsMenu').hidden = true;
+    loadConvos();
+  } catch (err) { alert(err.message); }
+};
+document.addEventListener('click', (e2) => {
+  if (!$('labelsMenu').hidden && !e2.target.closest('#labelsMenu') && e2.target !== $('labelsBtn')) $('labelsMenu').hidden = true;
+});
+
+// بحث داخل المحادثة المفتوحة
+$('chatSearchBtn').onclick = () => {
+  const w = $('chatSearchWrap');
+  w.hidden = !w.hidden;
+  if (w.hidden) { $('chatSearchIn').value = ''; filterChatMsgs(''); }
+  else $('chatSearchIn').focus();
+};
+$('chatSearchIn').oninput = () => filterChatMsgs($('chatSearchIn').value.trim());
+function filterChatMsgs(q) {
+  let shown = 0, total = 0;
+  document.querySelectorAll('#messages .msg').forEach((d) => {
+    total++;
+    const hit = !q || d.textContent.includes(q);
+    d.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  });
+  document.querySelectorAll('#messages .day-sep').forEach((d) => { d.style.display = q ? 'none' : ''; });
+  $('chatSearchCount').textContent = q ? `${shown} / ${total}` : '';
+}
+
+// تسجيل رسالة صوتية من صندوق الرد
+let mediaRec = null, recChunks = [], recStart = 0, recTimerInt = null, recStream = null;
+const recFmt = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+function stopRecTracks() { recStream?.getTracks().forEach((tr) => tr.stop()); recStream = null; clearInterval(recTimerInt); }
+$('micBtn').onclick = async () => {
+  if (mediaRec) return;
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch { alert(t9n('الميكروفون غير متاح — اسمح بالوصول من إعدادات المتصفح')); return; }
+  const mime = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' : (MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '');
+  mediaRec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
+  recChunks = [];
+  recStart = Date.now();
+  mediaRec.ondataavailable = (e2) => { if (e2.data.size) recChunks.push(e2.data); };
+  mediaRec.start(250);
+  $('recBar').hidden = false;
+  $('recTime').textContent = '0:00';
+  recTimerInt = setInterval(() => { $('recTime').textContent = recFmt(Date.now() - recStart); }, 500);
+};
+$('recCancel').onclick = () => {
+  mediaRec?.stop();
+  mediaRec = null;
+  recChunks = [];
+  stopRecTracks();
+  $('recBar').hidden = true;
+};
+$('recSend').onclick = () => {
+  if (!mediaRec) return;
+  mediaRec.onstop = async () => {
+    const blob = new Blob(recChunks, { type: mediaRec.mimeType || 'audio/ogg' });
+    mediaRec = null;
+    recChunks = [];
+    stopRecTracks();
+    $('recBar').hidden = true;
+    if (blob.size < 500) return;
+    const sendBtn = $('sendBtn');
+    sendBtn.disabled = true;
+    sendBtn.textContent = t9n('جارٍ الإرسال...');
+    try {
+      const ext = blob.type.includes('ogg') ? 'ogg' : 'webm';
+      const up = await fetch(`/api/upload?mime=${encodeURIComponent(blob.type)}&filename=${encodeURIComponent('voice.' + ext)}&pn=${encodeURIComponent(currentPn ?? '')}`, { method: 'POST', body: blob });
+      const upData = await up.json().catch(() => ({}));
+      if (!up.ok) throw new Error(upData.error || ('HTTP ' + up.status));
+      await api(`/api/conversations/${currentWaId}/reply`, { body: { body: '', media_id: upData.media_id, media_type: 'audio', media_url: '', quoted_id: pendingQuote?.id ?? '', phone_number_id: currentPn } });
+      clearQuote();
+    } catch (err) { alert(t9n('فشل الإرسال: ') + err.message); }
+    sendBtn.disabled = false;
+    sendBtn.textContent = t9n('إرسال');
+    await loadMessages();
+    loadConvos();
+  };
+  mediaRec.stop();
+};
+
 $('composer').onsubmit = async (e) => {
   e.preventDefault();
   const body = $('replyInput').value.trim();
@@ -1345,7 +1514,7 @@ $('composer').onsubmit = async (e) => {
   sendBtn.disabled = true;
   sendBtn.textContent = t9n('جارٍ الإرسال...');
   try {
-    const payload = { body, media_url: '', media_type: '', media_id: '', phone_number_id: currentPn };
+    const payload = { body, media_url: '', media_type: '', media_id: '', quoted_id: pendingQuote?.id ?? '', phone_number_id: currentPn };
     if (pendingAttach?.kind === 'file') {
       const f = pendingAttach.file;
       const up = await fetch(`/api/upload?mime=${encodeURIComponent(f.type || 'application/octet-stream')}&filename=${encodeURIComponent(f.name)}&pn=${encodeURIComponent(currentPn ?? '')}`, { method: 'POST', body: f });
@@ -1360,6 +1529,7 @@ $('composer').onsubmit = async (e) => {
     await api(`/api/conversations/${currentWaId}/reply`, { body: payload });
     $('replyInput').value = '';
     clearAttach();
+    clearQuote();
   } catch (err) { alert(t9n('فشل الإرسال: ') + err.message); }
   sendBtn.disabled = false;
   sendBtn.textContent = t9n('إرسال');
@@ -1520,7 +1690,22 @@ $('campRetry').onclick = async () => {
 $('conFile').onchange = async (e) => {
   const f = e.target.files[0];
   if (!f) return;
-  $('conImport').value = await f.text();
+  if (/\.xlsx?$/i.test(f.name)) {
+    try {
+      if (!window.XLSX) await new Promise((res2, rej) => {
+        const sc = document.createElement('script');
+        sc.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+        sc.onload = res2;
+        sc.onerror = rej;
+        document.head.appendChild(sc);
+      });
+      const wb = XLSX.read(await f.arrayBuffer());
+      const csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+      $('conImport').value = csv;
+    } catch { alert(t9n('تعذر قراءة ملف الإكسل — احفظه كـ CSV وجرب تاني')); }
+  } else {
+    $('conImport').value = await f.text();
+  }
   e.target.value = '';
 };
 
