@@ -69,7 +69,7 @@ import {
   recentWebhookEvents,
   resetFailedRecipients,
 } from './db.js';
-import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -373,16 +373,30 @@ app.get('/api/conversations/:waId/messages', (req, res) => {
   res.json({ messages: listMessages(req.params.waId, req.query.pn || null) });
 });
 
+// رفع ميديا من الجهاز إلى ميتا — يرجع media id يُرسل به في الرد
+app.post('/api/upload', express.raw({ type: () => true, limit: '16mb' }), wrap(async (req, res) => {
+  const mime = String(req.query.mime || 'application/octet-stream');
+  const filename = String(req.query.filename || 'file');
+  const pn = req.query.pn ? String(req.query.pn) : null;
+  if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'الملف فارغ' });
+  const mediaId = await uploadMedia(req.body, mime, filename, pn);
+  res.json({ ok: true, media_id: mediaId, mime });
+}));
+
 app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
   const waId = req.params.waId;
   const body = String(req.body?.body ?? '').trim();
   const mediaUrl = String(req.body?.media_url ?? '').trim();
+  const mediaId = String(req.body?.media_id ?? '').trim();
   const mediaType = String(req.body?.media_type ?? 'image');
   const pn = req.body?.phone_number_id ? String(req.body.phone_number_id) : null;
   if (!body && !mediaUrl) return res.status(400).json({ error: 'نص الرسالة أو رابط الميديا مطلوب' });
 
   let result;
-  if (mediaUrl) {
+  if (mediaId) {
+    result = await sendMediaId(waId, mediaType, mediaId, body || null, pn);
+    insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId, sender: req.agent?.name ?? null });
+  } else if (mediaUrl) {
     if (!/^https:\/\//.test(mediaUrl)) return res.status(400).json({ error: 'رابط الميديا لازم يبدأ بـ https://' });
     result = await sendMedia(waId, mediaType, mediaUrl, body || null, pn);
     insertOutbound({ waId, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl, sender: req.agent?.name ?? null });

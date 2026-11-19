@@ -160,6 +160,39 @@ export async function sendMedia(to, type, link, caption = null, phoneNumberId = 
 }
 
 // إرسال قالب مع هيدر ميديا اختياري (رابط صورة/مستند)
+// رفع ملف ميديا من الجهاز إلى ميتا واسترجاع media id (بديل الرابط العام)
+export async function uploadMedia(buf, mimeType, filename, phoneNumberId = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', mimeType);
+  form.append('file', new Blob([buf], { type: mimeType }), filename || 'file');
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId || PHONE_NUMBER_ID}/media`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${TOKEN}` },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(`خطأ من ميتا: ${data?.error?.message || `HTTP ${res.status}`}`);
+    err.meta = data;
+    throw err;
+  }
+  return data.id;
+}
+
+// إرسال ميديا مرفوعة مسبقًا بـ media id
+export async function sendMediaId(to, type, id, caption = null, phoneNumberId = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  const media = { id };
+  if (caption && (type === 'image' || type === 'video' || type === 'document')) media.caption = caption;
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    body: { messaging_product: 'whatsapp', to, type, [type]: media },
+  });
+  return data;
+}
+
 export async function sendTemplateEx(to, templateName, languageCode = 'ar', header = null, bodyParams = [], phoneNumberId = null) {
   requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
   const components = [];

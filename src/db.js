@@ -284,7 +284,7 @@ export function insertOutbound({ waId, phoneNumberId = null, waMessageId, body, 
      ON CONFLICT(wa_id, phone_number_id) DO UPDATE SET
        last_message = excluded.last_message,
        last_message_at = excluded.last_message_at`
-  ).run(waId, pn, body, t);
+  ).run(waId, pn, body ?? `[${type}]`, t);
 }
 
 export function updateStatus(waMessageId, status) {
