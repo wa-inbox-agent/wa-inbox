@@ -3,117 +3,196 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>منصة واتساب</title>
+<title>غرفة جازان | منصة واتساب</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   [hidden] { display: none !important; }
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #0b141a; color: #e9edef; height: 100vh; display: flex; flex-direction: column; }
-  header { background: #202c33; padding: 8px 16px; display: flex; align-items: center; gap: 6px; font-weight: 600; }
-  header .brand { font-size: 17px; margin-inline-end: 14px; }
-  nav button { background: none; border: none; color: #8696a0; font-size: 15px; font-weight: 600; padding: 8px 14px; cursor: pointer; border-radius: 8px; }
-  nav button.active { background: #2a3942; color: #00a884; }
-  #health { font-size: 12px; font-weight: 400; margin-inline-start: auto; }
-  #health.ok { color: #00a884; } #health.bad { color: #f15c6d; }
-  main { flex: 1; display: flex; min-height: 0; }
-  .view { display: none; flex: 1; min-height: 0; }
+  :root {
+    --navy: #222b5d; --navy-2: #1a2148; --navy-3: #2e3873;
+    --gold: #e0c390; --gold-2: #c9a85f;
+    --bg: #f3f4f8; --card: #ffffff; --border: #e4e6f0; --border-2: #d9dcea;
+    --text: #1f2430; --muted: #6b7385;
+    --ok: #1f9d6b; --warn: #d97706; --bad: #d64545; --info: #2f7fd6; --purple: #8b5cf6;
+    --field: #f6f7fb;
+    --shadow: 0 1px 3px rgba(24,28,60,.07), 0 4px 14px rgba(24,28,60,.05);
+    --radius: 12px;
+  }
+  html { height: 100%; }
+  body { font-family: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: row; overflow: hidden; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #c9cddb; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ===== الشريط الجانبي ===== */
+  header { width: 252px; flex: none; height: 100vh; position: sticky; top: 0; background: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 100%); color: #fff; display: flex; flex-direction: column; padding: 18px 14px 14px; gap: 14px; overflow-y: auto; }
+  .brand { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .brand .logo-tile { background: #fff; border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .brand .logo-tile img { width: 108px; height: auto; display: block; }
+  .brand .brand-sub { color: var(--gold); font-size: 13.5px; font-weight: 500; text-align: center; }
+  nav { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  nav button { display: flex; align-items: center; gap: 11px; width: 100%; background: none; border: none; border-inline-start: 3px solid transparent; color: #c3c9e4; font-family: inherit; font-size: 14.5px; font-weight: 500; padding: 10px 12px; cursor: pointer; border-radius: 10px; transition: background .15s, color .15s; text-align: start; }
+  nav button .ico { font-size: 16px; width: 22px; text-align: center; }
+  nav button:hover { background: rgba(255,255,255,.08); color: #fff; }
+  nav button.active { background: rgba(224,195,144,.16); border-inline-start-color: var(--gold); color: #fff; font-weight: 700; }
+  .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 9px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14); }
+  #langBtn { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); color: #fff; border-radius: 9px; padding: 7px 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s; }
+  #langBtn:hover { background: rgba(224,195,144,.25); }
+  #health { font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 7px; }
+  #health::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #8a90b8; flex: none; }
+  #health.ok { color: #7ee2b8; } #health.ok::before { background: #7ee2b8; }
+  #health.bad { color: #ff9d9d; } #health.bad::before { background: #ff9d9d; }
+  #meBadge { font-size: 12.5px; color: #aab1d4; }
+  #logoutBtn { margin: 0; align-self: flex-start; }
+
+  /* ===== شاشة الدخول ===== */
+  #loginOverlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: linear-gradient(150deg, var(--navy) 0%, var(--navy-2) 60%, #141a3c 100%); padding: 20px; }
+  #loginForm { width: 370px; max-width: 100%; background: #fff; border-radius: 18px; padding: 34px 32px 28px; box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: start; }
+  #loginForm .login-logo { display: flex; justify-content: center; margin-bottom: 14px; }
+  #loginForm .login-logo img { width: 92px; height: auto; }
+  #loginForm h3 { color: var(--navy); font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 2px; }
+  #loginForm .login-sub { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 6px; }
+  #loginForm .gold-line { width: 56px; height: 3px; border-radius: 3px; background: var(--gold); margin: 10px auto 16px; }
+  #loginForm .btn { width: 100%; margin-top: 16px; }
+  #loginPass { width: 100%; background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 11px 13px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
+  #loginPass:focus { border-color: var(--navy-3); box-shadow: 0 0 0 3px rgba(46,56,115,.13); }
+
+  /* ===== الهيكل ===== */
+  .view { display: none; flex: 1; min-height: 0; min-width: 0; }
   .view.active { display: flex; }
 
-  /* المحادثات */
-  #inboxSide { width: 320px; min-width: 260px; background: #111b21; border-inline-end: 1px solid #222d34; display: flex; flex-direction: column; min-height: 0; }
+  /* ===== المحادثات ===== */
+  #inboxSide { width: 340px; min-width: 280px; background: var(--card); border-inline-end: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  #inboxSide .side-tools { padding: 12px; display: flex; flex-direction: column; gap: 9px; border-bottom: 1px solid var(--border); }
+  #convoSearch { background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 9px 12px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; width: 100%; }
+  #convoSearch:focus { border-color: var(--navy-3); box-shadow: 0 0 0 3px rgba(46,56,115,.12); }
+  #convoFilters { display: flex; gap: 6px; flex-wrap: wrap; }
   #convos { overflow-y: auto; flex: 1; }
-  .convo { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #1f2c33; }
-  .convo:hover, .convo.active { background: #2a3942; }
-  .convo .name { font-weight: 600; display: flex; justify-content: space-between; }
-  .convo .badge { background: #00a884; color: #111b21; border-radius: 10px; font-size: 11px; padding: 1px 7px; font-weight: 700; }
-  .convo .preview { color: #8696a0; font-size: 13px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #chatHeader { background: #202c33; padding: 10px 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
-  #chatHeader .bot-toggle { margin-inline-start: auto; font-size: 12px; font-weight: 400; display: flex; align-items: center; gap: 6px; color: #8696a0; }
-  .chip { background:#2a3942; color:#8696a0; border:1px solid #3b4a54; border-radius:20px; padding:4px 12px; font-size:12px; cursor:pointer; }
-  .chip.active { background:#00a884; color:#0b141a; border-color:#00a884; font-weight:600; }
-  #contactPanel { background:#111b21; border-bottom:1px solid #2a3942; padding:12px 16px; }
-  #contactPanel .cpgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; }
-  .note { background:#202c33; border-radius:8px; padding:6px 10px; margin:4px 0; font-size:13px; }
-  .note .meta { color:#8696a0; font-size:11px; }
-  #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-  .msg { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-  .msg.inbound { background: #202c33; align-self: flex-start; }
-  .msg.outbound { background: #005c4b; align-self: flex-end; }
-  .msg .meta { font-size: 11px; color: #8696a0; margin-top: 4px; text-align: left; direction: ltr; }
-  .msg .status-read { color: #53bdeb; }
-  .msg .bot-tag { color: #f0b429; }
-  #composer { display: flex; gap: 8px; padding: 10px 16px; background: #202c33; }
-  #composer input { flex: 1; background: #2a3942; border: none; border-radius: 8px; padding: 12px; color: #e9edef; font-size: 15px; outline: none; }
-  #composer button, .btn { background: #00a884; color: #111b21; border: none; border-radius: 8px; padding: 0 22px; font-size: 15px; font-weight: 700; cursor: pointer; }
-  #composer button:disabled, .btn:disabled { opacity: .5; cursor: default; }
-  #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #8696a0; font-size: 16px; }
+  .convo { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f0f1f7; border-inline-start: 3px solid transparent; transition: background .12s; }
+  .convo:hover { background: #f6f7fb; }
+  .convo.active { background: #eceef8; border-inline-start-color: var(--navy); }
+  .convo .name { font-weight: 700; font-size: 14.5px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .convo .badge { background: var(--gold); color: var(--navy-2); border-radius: 12px; font-size: 11.5px; padding: 1px 8px; font-weight: 800; flex: none; }
+  .convo .preview { color: var(--muted); font-size: 13px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f5f0; }
+  #chatHeader { background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(24,28,60,.05); z-index: 2; }
+  #chatHeader .bot-toggle { margin-inline-start: auto; font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .chip { background: #eef0f7; color: #4b5163; border: 1px solid #dde0ec; border-radius: 20px; padding: 4px 13px; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .12s; }
+  .chip:hover { border-color: var(--navy-3); color: var(--navy); }
+  .chip.active { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 700; }
+  #contactPanel { background: #fbfcfe; border-bottom: 1px solid var(--border); padding: 14px 18px; }
+  #contactPanel .cpgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; }
+  .note { background: #f4f5fa; border-inline-start: 3px solid var(--gold); border-radius: 8px; padding: 7px 11px; margin: 5px 0; font-size: 13px; }
+  .note .meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 7px; }
+  .msg { max-width: 62%; padding: 9px 13px; border-radius: 12px; font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; box-shadow: 0 1px 2px rgba(24,28,60,.08); }
+  .msg.inbound { background: #fff; border: 1px solid var(--border); align-self: flex-start; border-start-start-radius: 4px; }
+  .msg.outbound { background: #e6e9f8; color: #1d2242; align-self: flex-end; border-start-end-radius: 4px; }
+  .msg .meta { font-size: 11px; color: #8a90a2; margin-top: 4px; text-align: end; direction: ltr; }
+  .msg .status-read { color: var(--info); }
+  .msg .bot-tag { color: var(--warn); font-weight: 700; }
+  #composer { display: flex; gap: 8px; padding: 12px 16px; background: var(--card); border-top: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+  #composer input { flex: 1; min-width: 140px; background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 11px 13px; color: var(--text); font-size: 14.5px; outline: none; font-family: inherit; }
+  #composer input:focus { border-color: var(--navy-3); box-shadow: 0 0 0 3px rgba(46,56,115,.12); }
+  #composer button { padding: 11px 24px; }
+  #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15.5px; }
 
-  /* الصفحات الإدارية */
-  .page { flex: 1; overflow-y: auto; padding: 24px; }
-  .page h2 { margin-bottom: 16px; font-size: 20px; }
-  .card { background: #111b21; border: 1px solid #222d34; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  .card h3 { font-size: 15px; margin-bottom: 12px; color: #00a884; }
-  label { display: block; font-size: 13px; color: #8696a0; margin: 10px 0 4px; }
-  input[type=text], select, textarea { width: 100%; background: #2a3942; border: 1px solid #3b4a54; border-radius: 8px; padding: 10px; color: #e9edef; font-size: 14px; outline: none; font-family: inherit; }
-  textarea { resize: vertical; min-height: 80px; }
-  .btn { padding: 10px 22px; margin-top: 12px; }
-  .btn.secondary { background: #2a3942; color: #e9edef; }
-  .btn.danger { background: #f15c6d; }
+  /* ===== الصفحات الإدارية ===== */
+  .page { flex: 1; overflow-y: auto; padding: 26px 30px; max-width: 1120px; margin-inline: auto; width: 100%; }
+  .page h2 { margin-bottom: 18px; font-size: 21px; font-weight: 800; color: var(--navy); padding-inline-start: 12px; border-inline-start: 4px solid var(--gold); border-radius: 2px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 18px; }
+  .card h3 { font-size: 15.5px; margin-bottom: 13px; color: var(--navy); font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  label { display: block; font-size: 13px; color: #4b5163; font-weight: 500; margin: 11px 0 5px; }
+  input[type=text], input[type=password], select, textarea, input[type=datetime-local], input:not([type]) { width: 100%; background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; transition: border-color .12s, box-shadow .12s; }
+  input:focus, select:focus, textarea:focus { border-color: var(--navy-3); box-shadow: 0 0 0 3px rgba(46,56,115,.12); }
+  textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+  input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--navy); cursor: pointer; }
+  .btn { background: var(--navy); color: #fff; border: 1px solid var(--navy); border-radius: 10px; padding: 10px 22px; font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .14s, transform .05s; }
+  .btn:hover { background: var(--navy-3); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.secondary { background: #eef0f7; color: var(--navy); border-color: #d9dcea; }
+  .btn.secondary:hover { background: #e2e5f2; }
+  .btn.danger { background: #fdecec; color: var(--bad); border-color: #f3c1c1; }
+  .btn.danger:hover { background: #f9dbdb; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #222d34; }
-  th { color: #8696a0; font-weight: 600; font-size: 12.5px; }
-  .pill { border-radius: 10px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
-  .pill.APPROVED, .pill.read { background: #00a88422; color: #00a884; }
-  .pill.PENDING, .pill.sent, .pill.pending { background: #f0b42922; color: #f0b429; }
-  .pill.REJECTED, .pill.failed { background: #f15c6d22; color: #f15c6d; }
-  .pill.delivered { background: #53bdeb22; color: #53bdeb; }
-  .pill.running { background: #53bdeb22; color: #53bdeb; }
-  .pill.skipped, .pill.scheduled { background: #b47bde22; color: #b47bde; }
-  input[type=datetime-local] { width: 100%; background: #2a3942; border: 1px solid #3b4a54; border-radius: 8px; padding: 10px; color: #e9edef; font-size: 14px; outline: none; font-family: inherit; }
-  .pill.done { background: #00a88422; color: #00a884; }
-  .pill.draft { background: #8696a022; color: #8696a0; }
-  .err { background: #f15c6d22; color: #f15c6d; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; display: none; }
-  .hint { color: #8696a0; font-size: 12.5px; margin-top: 6px; }
-  .switch-row { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-  progress { width: 140px; height: 8px; }
+  th, td { padding: 10px 12px; text-align: start; border-bottom: 1px solid #eef0f6; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+  tbody tr:hover td { background: #f8f9fc; }
+  .pill { border-radius: 12px; padding: 2px 11px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .pill.APPROVED, .pill.read, .pill.done { background: #1f9d6b1f; color: var(--ok); }
+  .pill.PENDING, .pill.sent, .pill.pending { background: #d977061f; color: var(--warn); }
+  .pill.REJECTED, .pill.failed { background: #d645451f; color: var(--bad); }
+  .pill.delivered, .pill.running { background: #2f7fd61f; color: var(--info); }
+  .pill.skipped, .pill.scheduled { background: #8b5cf61f; color: var(--purple); }
+  .pill.draft { background: #6b73851f; color: var(--muted); }
+  .err { background: #fdecec; color: var(--bad); border: 1px solid #f3c1c1; border-radius: 10px; padding: 11px 15px; margin-bottom: 13px; font-size: 14px; display: none; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 8px; line-height: 1.6; }
+  .switch-row { display: flex; align-items: center; gap: 11px; font-size: 15px; }
+  progress { width: 140px; height: 8px; accent-color: var(--navy); }
+  #repCards { display: flex; gap: 13px; flex-wrap: wrap; margin-bottom: 18px; }
+  #repCards .card { flex: 1; min-width: 150px; margin: 0; }
+  #repCards .card h3 { margin-bottom: 5px; font-size: 13.5px; }
+  #repCards .stat-num { font-size: 24px; font-weight: 800; color: var(--navy); }
+  @media (max-width: 860px) {
+    body { flex-direction: column; }
+    header { width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 10px 12px; }
+    .brand { flex-direction: row; }
+    .brand .logo-tile img { width: 58px; }
+    nav { flex-direction: row; overflow-x: auto; flex: 1; }
+    nav button { width: auto; white-space: nowrap; }
+    .side-foot { margin: 0; flex-direction: row; align-items: center; border: none; padding: 0; }
+  }
   @media (max-width: 700px) { #convos { width: 100%; } #chat { display: none; } }
 </style>
 </head>
 <body>
-<div id="loginOverlay" hidden style="position:fixed;inset:0;background:#0b141a;z-index:50;display:flex;align-items:center;justify-content:center">
-  <form id="loginForm" class="card" style="width:320px">
+<div id="loginOverlay" hidden>
+  <form id="loginForm">
+    <div class="login-logo"><img src="/logo.png" alt="Jazan Chamber" /></div>
     <h3>تسجيل الدخول</h3>
+    <div class="login-sub">منصة واتساب للأعمال</div>
+    <div class="gold-line"></div>
     <div class="err" id="loginErr"></div>
     <label>اسم المستخدم</label>
     <input type="text" id="loginUser" autocomplete="username" />
     <label>كلمة السر</label>
-    <input type="password" id="loginPass" autocomplete="current-password" style="width:100%;background:#2a3942;border:1px solid #3b4a54;border-radius:8px;padding:10px;color:#e9edef;font-size:14px;outline:none" />
-    <button class="btn" type="submit" style="width:100%">دخول</button>
+    <input type="password" id="loginPass" autocomplete="current-password" />
+    <button class="btn" type="submit">دخول</button>
   </form>
 </div>
 <header>
-  <span class="brand">💬 منصة واتساب</span>
+  <div class="brand">
+    <div class="logo-tile"><img src="/logo.png" alt="Jazan Chamber" /></div>
+    <div class="brand-sub">منصة واتساب للأعمال</div>
+  </div>
   <nav>
-    <button data-view="inbox" class="active">المحادثات</button>
-    <button data-view="templates">القوالب</button>
-    <button data-view="campaigns">الحملات</button>
-    <button data-view="contacts">جهات الاتصال</button>
-    <button data-view="agents" id="agentsNav" hidden>الموظفون</button>
-    <button data-view="reports" id="reportsNav">التقارير</button>
-    <button data-view="api" id="apiNav" hidden>API</button>
-    <button data-view="bot">البوت</button>
+    <button data-view="inbox" class="active"><span class="ico">💬</span>المحادثات</button>
+    <button data-view="templates"><span class="ico">📋</span>القوالب</button>
+    <button data-view="campaigns"><span class="ico">📣</span>الحملات</button>
+    <button data-view="contacts"><span class="ico">👥</span>جهات الاتصال</button>
+    <button data-view="agents" id="agentsNav" hidden><span class="ico">🧑‍💼</span>الموظفون</button>
+    <button data-view="reports" id="reportsNav"><span class="ico">📊</span>التقارير</button>
+    <button data-view="api" id="apiNav" hidden><span class="ico">🔌</span>API</button>
+    <button data-view="bot"><span class="ico">🤖</span>البوت</button>
   </nav>
-  <span id="health">...</span>
-  <span id="meBadge" style="font-size:13px;color:#8696a0"></span>
-  <button id="logoutBtn" class="btn secondary" style="padding:4px 12px;font-size:12px;margin:0" hidden>خروج</button>
+  <div class="side-foot">
+    <button id="langBtn" type="button">English</button>
+    <span id="health">...</span>
+    <span id="meBadge"></span>
+    <button id="logoutBtn" class="btn secondary" style="padding:5px 14px;font-size:12.5px" hidden>خروج</button>
+  </div>
 </header>
 
 <!-- المحادثات -->
 <div class="view active" id="view-inbox">
   <div id="inboxSide">
-    <div style="padding:8px 10px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #1f2c33">
-      <input id="convoSearch" placeholder="🔍 بحث بالاسم أو الرقم..." style="background:#2a3942;border:none;border-radius:8px;padding:8px 10px;color:#e9edef;outline:none" />
-      <div id="convoFilters" style="display:flex;gap:6px;flex-wrap:wrap">
+    <div class="side-tools">
+      <input id="convoSearch" placeholder="🔍 بحث بالاسم أو الرقم..." />
+      <div id="convoFilters">
         <button class="chip active" data-filter="all">الكل</button>
         <button class="chip" data-filter="unread">غير مقروءة</button>
         <button class="chip" data-filter="mine">مسندة إليّ</button>
@@ -250,7 +329,7 @@
       <input type="text" id="campName" />
       <label>القالب المعتمد</label>
       <select id="campTemplate"><option value="">— حمّل القوالب أولًا —</option></select>
-      <div id="campTplPreview" class="hint" style="white-space:pre-wrap;background:#0b141a;border-radius:8px;padding:10px;display:none"></div>
+      <div id="campTplPreview" class="hint" style="white-space:pre-wrap;background:#f0f1f8;border:1px solid var(--border);border-radius:10px;padding:12px;display:none"></div>
       <div id="campVars"></div>
       <label>الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)</label>
       <textarea id="campNumbers" dir="ltr" rows="5"></textarea>
@@ -440,6 +519,53 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+// ===== i18n =====
+let LANG = localStorage.getItem('lang') || 'ar';
+const I18N = {"تسجيل الدخول": "Sign in", "اسم المستخدم": "Username", "كلمة السر": "Password", "دخول": "Sign in", "منصة واتساب للأعمال": "WhatsApp Business Platform", "💬 منصة واتساب": "WhatsApp Platform", "المحادثات": "Inbox", "القوالب": "Templates", "الحملات": "Campaigns", "جهات الاتصال": "Contacts", "الموظفون": "Team", "التقارير": "Reports", "البوت": "Bot", "خروج": "Log out", "الكل": "All", "غير مقروءة": "Unread", "مسندة إليّ": "Mine", "غير مسندة": "Unassigned", "المغلقة": "Closed", "🔍 بحث بالاسم أو الرقم...": "🔍 Search by name or number...", "اختر محادثة من القائمة": "Pick a conversation from the list", "👤 البيانات": "👤 Details", "🤖 البوت": "🤖 Bot", "الاسم": "Name", "الوسوم (كلمات مفصولة بمسافات)": "Tags (space-separated words)", "ملاحظات عامة عن جهة الاتصال": "General notes about this contact", "حفظ البيانات": "Save details", "تم الحفظ ✓": "Saved ✓", "ملاحظات الفريق على المحادثة (داخلية، لا تصل للعميل)": "Team notes on this conversation (internal, never sent to the customer)", "أضف ملاحظة داخلية...": "Add an internal note...", "إضافة": "Add", "نص فقط": "Text only", "صورة": "Image", "مستند": "Document", "فيديو": "Video", "صوت": "Audio", "رابط ميديا https:// (اختياري)": "Media URL https:// (optional)", "اكتب رسالة... (الرد اليدوي يوقف البوت عن هذه المحادثة)": "Type a message... (a manual reply pauses the bot on this conversation)", "إرسال": "Send", "نوع الميديا": "Media type", "رد جاهز": "Canned reply", "⚡ رد جاهز": "⚡ Canned reply", "قوالب الرسائل": "Message templates", "إنشاء قالب جديد": "Create a new template", "الاسم (إنجليزي صغير بدون مسافات، مثل welcome_offer)": "Name (lowercase English, no spaces, e.g. welcome_offer)", "الفئة": "Category", "تسويق (MARKETING)": "Marketing (MARKETING)", "خدمة (UTILITY)": "Utility (UTILITY)", "توثيق (AUTHENTICATION)": "Authentication (AUTHENTICATION)", "اللغة": "Language", "العربية (ar)": "Arabic (ar)", "الإنجليزية (en_US)": "English (en_US)", "نص الرسالة (للمتغيرات استخدم {{1}} {{2}} ...)": "Message body (use {{1}} {{2}} ... for variables)", "أمثلة المتغيرات بالترتيب، مفصولة بـ | (مطلوبة لو النص فيه متغيرات)": "Variable examples in order, separated by | (required if the body has variables)", "الهيدر (اختياري)": "Header (optional)", "بدون": "None", "نص": "Text", "الفوتر (اختياري)": "Footer (optional)", "الأزرار (اختياري، حتى 3)": "Buttons (optional, up to 3)", "رد سريع": "Quick reply", "رابط": "URL", "اتصال": "Call", "نص الزر": "Button label", "الرابط أو رقم الهاتف": "URL or phone number", "تقديم القالب للمراجعة": "Submit template for review", "ميتا تراجع القالب قبل اعتماده (عادة من دقائق لساعات). الحملات ترسل بالقوالب المعتمدة فقط.": "Meta reviews the template before approval (usually minutes to hours). Campaigns send approved templates only.", "القوالب الحالية": "Current templates", "تحديث": "Refresh", "النص": "Body", "الحالة": "Status", "مثال: مرحبًا {{1}}! عرض خاص لك على {{2}} هذا الأسبوع...": "e.g. Hi {{1}}! A special offer on {{2}} this week...", "أحمد | دورة التصميم": "Ahmed | design course", "نص الهيدر": "Header text", "مثال: أكاديمية غرفة جازان": "e.g. Jazan Chamber Academy", "الحملات الجماعية": "Bulk campaigns", "حملة جديدة": "New campaign", "اسم الحملة": "Campaign name", "القالب المعتمد": "Approved template", "— حمّل القوالب أولًا —": "— Load templates first —", "الأرقام (رقم في كل سطر أو مفصولة بفواصل، بالصيغة الدولية بدون + مثل 9665xxxxxxxx)": "Numbers (one per line or comma-separated, international format without +, e.g. 9665xxxxxxxx)", "أو أضف قسمًا من جهات الاتصال (تاج، اختياري)": "Or add a contact segment (tag, optional)", "مثال: vip": "e.g. vip", "هيدر ميديا للقالب (رابط صورة/مستند https، اختياري — فقط لو القالب له هيدر ميديا)": "Template media header (image/document https URL, optional — only if the template has a media header)", "جدولة الإرسال لوقت لاحق (اختياري)": "Schedule sending for later (optional)", "إنشاء وبدء الإرسال": "Create and start sending", "الإرسال برسالة كل ثانية تقريبًا. القالب يرسل كما هو لكل رقم؛ تجنّب الإزعاج عشان رقمك ما يتبلّغش. من ألغى اشتراكه لا تصله الحملة. لو حددت وقت جدولة، الحملة تبدأ لوحدها في الموعد.": "Sends roughly one message per second. The template goes as-is to every number; avoid spam so your number doesn't get reported. Opted-out contacts are skipped. If you set a schedule time, the campaign starts on its own.", "الإجمالي": "Total", "ناجح": "Sent", "فاشل": "Failed", "الموعد": "Schedule", "↻ إعادة إرسال الفاشل": "↻ Resend failed", "الرقم": "Number", "ملاحظة": "Note", "استيراد جهات اتصال": "Import contacts", "سطر لكل جهة: الرقم، الاسم (اختياري)، الأقسام/التاجات (اختياري)": "One line per contact: number, name (optional), segments/tags (optional)", "9665xxxxxxxx,أحمد محمد,vip": "9665xxxxxxxx,Ahmed Ali,vip", "استيراد": "Import", "رفع ملف CSV": "Upload CSV file", "الرقم بالصيغة الدولية بدون +. الرقم الموجود مسبقًا يتحدّث اسمه وأقسامه. كل رقم يرسل رسالة لصندوق الوارد يتسجّل تلقائيًا.": "Number in international format without +. An existing number gets its name and segments updated. Any number that messages the inbox is registered automatically.", "القائمة": "List", "تصدير CSV": "Export CSV", "الأقسام": "Segments", "يستلم الحملات": "Receives campaigns", "ألغِ التحديد لإيقاف الحملات عن رقم دون حذفه. أي رسالة واردة تحتوي \"إيقاف\" أو \"stop\" تلغي الاشتراك تلقائيًا.": "Uncheck to stop campaigns to a number without deleting it. Any inbound message containing \"stop\" unsubscribes automatically.", "حالة الاتصال بميتا (Webhook)": "Meta connection status (Webhook)", "الرسائل آخر 14 يوم": "Messages, last 14 days", "أنشط المحادثات": "Most active conversations", "الوقت": "Time", "النوع": "Type", "التفاصيل": "Details", "اليوم": "Day", "واردة": "Inbound", "صادرة": "Outbound", "عدد الرسائل": "Messages", "الـ API الخارجي": "External API", "إنشاء مفتاح جديد": "Create a new key", "اسم النظام المستخدم للمفتاح": "Name of the system using this key", "مثال: نظام العضويات": "e.g. membership system", "إنشاء": "Create", "المفتاح يظهر مرة واحدة هنا فقط — انسخه فورًا. الاستخدام: POST إلى": "The key is shown once, here only — copy it now. Usage: POST to", "مع هيدر": "with header", "وجسم": "and body", "أو": "or", "المفاتيح": "Keys", "أنشئ": "Created", "آخر استخدام": "Last used", "إضافة موظف": "Add team member", "اسم المستخدم (إنجليزي بدون مسافات)": "Username (English, no spaces)", "كلمة السر (6 أحرف على الأقل)": "Password (at least 6 characters)", "الدور": "Role", "موظف": "Agent", "مدير": "Admin", "المستخدم": "Username", "نشط": "Active", "الرد الآلي (البوت)": "Auto-reply (Bot)", "البوت مفعّل على كل المحادثات": "Bot enabled on all conversations", "رسالة الترحيب لأول محادثة": "Welcome message for the first conversation", "إرسال رسالة ترحيب تلقائية عند أول رسالة من عميل جديد": "Send an automatic welcome message on a new customer's first message", "حفظ": "Save", "إضافة قاعدة": "Add a rule", "رد مباشر": "Direct reply", "قائمة خيارات مرقّمة": "Numbered options menu", "لو الرسالة تحتوي على (اكتب * للرد على أي رسالة)": "If the message contains (type * to reply to any message)", "مثال: السعر": "e.g. price", "يرد بـ": "Reply with", "مثال: أسعارنا تبدأ من...": "e.g. Our prices start at...", "خيارات القائمة (سطر لكل خيار: رقم | العنوان | الرد)": "Menu options (one line per option: number | label | reply)", "1 | الاشتراكات | تفاصيل الاشتراكات...\n2 | الفعاليات | تفاصيل الفعاليات...": "1 | Memberships | membership details...\n2 | Events | event details...", "إضافة القاعدة": "Add rule", "أول قاعدة تطابق هي اللي بتتنفذ. في القائمة المرقّمة: العميل يرد برقم الخيار فيصله رده. الرد اليدوي من صندوق الوارد يوقف البوت عن المحادثة دي تلقائيًا حتى تعيد تفعيله من رأس المحادثة.": "The first matching rule runs. In a numbered menu, the customer replies with the option number and gets its reply. A manual reply from the inbox pauses the bot on that conversation until you re-enable it from the conversation header.", "القواعد الحالية": "Current rules", "الكلمة المفتاحية": "Keyword", "الرد": "Reply", "الردود الجاهزة (تظهر كاختصار ⚡ في صندوق الرد بالوارد)": "Canned replies (show as the ⚡ shortcut in the inbox reply box)", "العنوان": "Title", "مثال: ترحيب": "e.g. Welcome", "الرد خارج أوقات العمل": "After-hours reply", "تفعيل الرد التلقائي خارج الدوام": "Enable the automatic after-hours reply", "ساعات العمل (بتوقيت السعودية)": "Working hours (Saudi time)", "إلى": "to", "أيام العمل (0=الأحد … 6=السبت، مفصولة بفواصل)": "Working days (0=Sunday … 6=Saturday, comma-separated)", "نص الرد": "Reply text", "حفظ الإعدادات": "Save settings", "يرد مرة واحدة كل 12 ساعة على كل محادثة خارج أوقات العمل، ويتجاوز قواعد البوت الأخرى في تلك الرسالة.": "Replies once every 12 hours per conversation outside working hours, overriding other bot rules for that message.", " (مدير)": " (Admin)", "متصل بميتا": "Connected to Meta", "بيانات ميتا ناقصة": "Meta credentials missing", "صندوق الوارد": "Inbox", "لا محادثات مطابقة": "No matching conversations", "↩️ إعادة فتح المحادثة": "↩️ Reopen conversation", "✔️ إغلاق المحادثة": "✔️ Close conversation", "إعادة تفعيل استقبال الحملات": "Re-enable campaign delivery", "إيقاف الحملات عنه (opt-out)": "Stop campaigns to this contact (opt-out)", "لا ملاحظات بعد": "No notes yet", "فشل الإرسال: ": "Sending failed: ", "مستند مرفق": "Attached document", "🤖 بوت": "🤖 Bot", "لا توجد قوالب بعد": "No templates yet", "تم تقديم القالب لمراجعة ميتا": "Template submitted for Meta review", "تجربة": "Test", "حذف": "Delete", "حذف القالب": "Delete template", "نهائيًا من حساب واتساب؟": "permanently from the WhatsApp account?", "إرسال القالب": "Send template", "تجريبيًا إلى رقم (بالصيغة الدولية بدون +):": "as a test to a number (international format without +):", "تم الإرسال ✓": "Sent ✓", "لا توجد قوالب معتمدة بعد": "No approved templates yet", "قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)": "Variable values in order (one sent per number)", "قيمة": "Value", "لا توجد حملات بعد": "No campaigns yet", "مستلمو حملة": "Campaign recipients", "أُعيد إرسال": "Resent", "رسالة فاشلة": "failed message(s)", "لا توجد رسائل فاشلة": "No failed messages", "اتجدولت الحملة لـ": "Campaign scheduled for", "بدأت الحملة لـ": "Campaign started for", "رقم": "number(s)", "لا توجد جهات اتصال بعد": "No contacts yet", "تم استيراد/تحديث": "Imported/updated", "جهة اتصال": "contact(s)", "📋 قائمة": "📋 Menu", "💬 رد": "💬 Reply", "لا توجد قواعد بعد": "No rules yet", "نص يظهر فوق الخيارات": "Text shown above the options", "تم حفظ إعدادات خارج الدوام": "After-hours settings saved", "رسائل واردة": "Inbound messages", "رسائل صادرة": "Outbound messages", "ردود البوت": "Bot replies", "ألغوا الاشتراك": "Opted out", "حملات": "Campaigns", "رسائل حملات ناجحة": "Successful campaign messages", "فاشلة": "Failed", "لا رسائل بعد": "No messages yet", "✓ الـ Webhook يستلم — آخر رسالة واردة: ": "✓ Webhook receiving — last inbound message: ", "⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.": "⚠ No webhook messages received yet. Make sure the Callback URL is connected in the Meta dashboard.", "رسالة": "Message", "حالة": "Status", "لا أحداث بعد": "No events yet", "لم يستخدم": "Never used", "لا مفاتيح بعد": "No API keys yet", "المفتاح (يظهر مرة واحدة): ": "Key (shown once): ", "لا ردود جاهزة بعد": "No canned replies yet", "العنوان والنص مطلوبان": "Title and body are required", "تم حفظ رسالة الترحيب": "Welcome message saved", "📌 غير مسندة": "📌 Unassigned", "فك الإسناد": "Unassign", "إسناد إليّ": "Assign to me"};
+const STATUS_LABELS = {
+  APPROVED: ['معتمد', 'Approved'], PENDING: ['قيد المراجعة', 'Pending'], REJECTED: ['مرفوض', 'Rejected'],
+  draft: ['مسودة', 'Draft'], scheduled: ['مجدولة', 'Scheduled'], running: ['قيد الإرسال', 'Running'],
+  done: ['مكتملة', 'Done'], failed: ['فاشلة', 'Failed'], pending: ['معلّقة', 'Pending'],
+  sent: ['أُرسلت', 'Sent'], delivered: ['سُلّمت', 'Delivered'], read: ['قُرأت', 'Read'], skipped: ['تم تخطيها', 'Skipped'],
+};
+const statusLabel = (s) => (STATUS_LABELS[s] ? STATUS_LABELS[s][LANG === 'ar' ? 0 : 1] : s);
+const tr = (s) => (LANG === 'en' ? (I18N[s] ?? s) : s);
+const origText = new WeakMap();
+function applyLang() {
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+  const skip = new Set(['SCRIPT', 'STYLE']);
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    if (skip.has(n.parentElement?.tagName)) continue;
+    const t = n.nodeValue.trim();
+    if (!t) continue;
+    if (!origText.has(n)) { if (/[\u0600-\u06FF]/.test(t)) origText.set(n, n.nodeValue); else continue; }
+    const orig = origText.get(n);
+    const key = orig.trim();
+    n.nodeValue = LANG === 'en' ? (I18N[key] !== undefined ? I18N[key] : orig) : orig;
+  }
+  document.querySelectorAll('[placeholder]').forEach((el) => {
+    if (!el.dataset.arPh) { if (/[\u0600-\u06FF]/.test(el.placeholder)) el.dataset.arPh = el.placeholder; else return; }
+    el.placeholder = LANG === 'en' ? (I18N[el.dataset.arPh] ?? el.dataset.arPh) : el.dataset.arPh;
+  });
+  document.querySelectorAll('[title]').forEach((el) => {
+    if (!el.dataset.arT) { if (/[\u0600-\u06FF]/.test(el.title)) el.dataset.arT = el.title; else return; }
+    el.title = LANG === 'en' ? (I18N[el.dataset.arT] ?? el.dataset.arT) : el.dataset.arT;
+  });
+  const lb = document.getElementById('langBtn');
+  if (lb) lb.textContent = LANG === 'ar' ? 'English' : 'العربية';
+  document.title = LANG === 'ar' ? 'غرفة جازان | منصة واتساب' : 'Jazan Chamber | WhatsApp Platform';
+}
+document.getElementById('langBtn')?.addEventListener('click', () => {
+  localStorage.setItem('lang', LANG === 'ar' ? 'en' : 'ar');
+  location.reload();
+});
+applyLang();
+
 let me = null;
 const showLogin = (show) => { $('loginOverlay').hidden = !show; };
 const api = async (url, opts) => {
@@ -472,7 +598,7 @@ $('logoutBtn').onclick = async () => {
 
 async function initMe(agent) {
   me = agent;
-  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? ' (مدير)' : '');
+  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? tr(' (مدير)') : '');
   $('logoutBtn').hidden = false;
   $('agentsNav').hidden = agent.role !== 'admin';
   $('apiNav').hidden = agent.role !== 'admin';
@@ -487,7 +613,7 @@ async function loadAgents() {
     tb.innerHTML = '';
     for (const a of agents) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td dir="ltr">${a.username}</td><td>${a.name}</td><td>${a.role === 'admin' ? 'مدير' : 'موظف'}</td><td><input type="checkbox" ${a.active ? 'checked' : ''} onchange="toggleAgent(${a.id}, this.checked)" /></td>`;
+      tr.innerHTML = `<td dir="ltr">${a.username}</td><td>${a.name}</td><td>${a.role === 'admin' ? tr('مدير') : tr('موظف')}</td><td><input type="checkbox" ${a.active ? 'checked' : ''} onchange="toggleAgent(${a.id}, this.checked)" /></td>`;
       tb.appendChild(tr);
     }
   } catch {}
@@ -519,20 +645,20 @@ async function assignTo(agentId) {
 function renderAssignArea(assignedName, assignedId) {
   const el = $('assignArea');
   if (!me) { el.innerHTML = ''; return; }
-  let html = assignedName ? `📌 ${assignedName}` : '📌 غير مسندة';
+  let html = assignedName ? `📌 ${assignedName}` : tr('📌 غير مسندة');
   if (me.role === 'admin' && agentList.length) {
-    html += ` <select id="assignSel" style="width:auto;padding:2px 6px;font-size:12px"><option value="">فك الإسناد</option>${agentList.filter((a) => a.active).map((a) => `<option value="${a.id}" ${a.id === assignedId ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`;
+    html += ` <select id="assignSel" style="width:auto;padding:2px 6px;font-size:12px"><option value="">${tr('فك الإسناد')}</option>${agentList.filter((a) => a.active).map((a) => `<option value="${a.id}" ${a.id === assignedId ? 'selected' : ''}>${a.name}</option>`).join('')}</select>`;
   } else if (!assignedName) {
-    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(${me.id})">إسناد إليّ</button>`;
+    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(${me.id})">${tr('إسناد إليّ')}</button>`;
   } else if (assignedId === me.id) {
-    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(null)">فك الإسناد</button>`;
+    html += ` <button class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0" onclick="assignTo(null)">${tr('فك الإسناد')}</button>`;
   }
   el.innerHTML = html;
   const sel = $('assignSel');
   if (sel) sel.onchange = () => assignTo(sel.value ? Number(sel.value) : null);
 }
 window.assignTo = assignTo;
-const fmtTime = (ms) => new Date(ms).toLocaleString('ar', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+const fmtTime = (ms) => new Date(ms).toLocaleString(LANG === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
 
 // التبويبات
 document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
@@ -552,7 +678,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
 async function loadHealth() {
   try {
     const h = await api('/api/health');
-    $('health').textContent = h.configured ? 'متصل بميتا' : 'بيانات ميتا ناقصة';
+    $('health').textContent = h.configured ? tr('متصل بميتا') : tr('بيانات ميتا ناقصة');
     $('health').className = h.configured ? 'ok' : 'bad';
   } catch {}
 }
@@ -573,7 +699,7 @@ async function loadConvos() {
   lastConversations = conversations;
   renderConvos();
   const totalUnread = conversations.filter((c) => c.status !== 'closed').reduce((sum, c) => sum + (c.unread || 0), 0);
-  document.title = totalUnread ? `(${totalUnread}) صندوق الوارد` : 'صندوق الوارد';
+  document.title = totalUnread ? `(${totalUnread}) ${tr('صندوق الوارد')}` : tr('صندوق الوارد');
 }
 function renderConvos() {
   const q = ($('convoSearch').value || '').trim();
@@ -596,7 +722,7 @@ function renderConvos() {
     div.onclick = () => openConvo(c);
     $('convos').appendChild(div);
   }
-  if (!list.length) $('convos').innerHTML = '<div style="padding:16px;color:#8696a0;font-size:13px">لا محادثات مطابقة</div>';
+  if (!list.length) $('convos').innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px">' + tr('لا محادثات مطابقة') + '</div>';
 }
 document.querySelectorAll('#convoFilters .chip').forEach((b) => (b.onclick = () => {
   document.querySelectorAll('#convoFilters .chip').forEach((x) => x.classList.remove('active'));
@@ -612,7 +738,7 @@ async function openConvo(c) {
   $('chatHeader').hidden = $('messages').hidden = $('composer').hidden = false;
   $('chatTitle').textContent = (c.name || c.wa_id) + ' — ' + c.wa_id;
   $('convBotToggle').checked = Boolean(c.bot_enabled);
-  $('convoStatusBtn').textContent = c.status === 'closed' ? '↩️ إعادة فتح المحادثة' : '✔️ إغلاق المحادثة';
+  $('convoStatusBtn').textContent = c.status === 'closed' ? tr('↩️ إعادة فتح المحادثة') : tr('✔️ إغلاق المحادثة');
   renderAssignArea(c.assigned_name ?? null, c.assigned_to ?? null);
   loadContactPanel(c.wa_id);
   await loadMessages();
@@ -624,7 +750,7 @@ $('convoStatusBtn').onclick = async () => {
   const c = lastConversations.find((x) => x.wa_id === currentWaId);
   const next = c?.status === 'closed' ? 'open' : 'closed';
   await api(`/api/conversations/${currentWaId}/status`, { body: { status: next } });
-  $('convoStatusBtn').textContent = next === 'closed' ? '↩️ إعادة فتح المحادثة' : '✔️ إغلاق المحادثة';
+  $('convoStatusBtn').textContent = next === 'closed' ? tr('↩️ إعادة فتح المحادثة') : tr('✔️ إغلاق المحادثة');
   loadConvos();
 };
 
@@ -638,7 +764,7 @@ async function loadContactPanel(waId) {
     $('cpTags').value = c.tags || '';
     $('cpNotes').value = c.notes || '';
     $('cpOptOut').dataset.state = c.opted_out ? '1' : '0';
-    $('cpOptOut').textContent = c.opted_out ? 'إعادة تفعيل استقبال الحملات' : 'إيقاف الحملات عنه (opt-out)';
+    $('cpOptOut').textContent = c.opted_out ? tr('إعادة تفعيل استقبال الحملات') : tr('إيقاف الحملات عنه (opt-out)');
   } catch {
     $('cpName').value = $('cpTags').value = $('cpNotes').value = '';
   }
@@ -668,7 +794,7 @@ async function loadTeamNotes() {
   try {
     const { notes } = await api(`/api/conversations/${currentWaId}/notes`);
     $('cpTeamNotes').innerHTML = notes.map((n) => `<div class="note"><div>${esc(n.body)}</div><div class="meta">${esc(n.agent_name || '')} · ${fmtTime(n.created_at)}</div></div>`).join('')
-      || '<div style="color:#8696a0;font-size:12px">لا ملاحظات بعد</div>';
+      || '<div style="color:var(--muted);font-size:12px">' + tr('لا ملاحظات بعد') + '</div>';
   } catch {}
 }
 
@@ -683,7 +809,7 @@ $('cpNoteAdd').onclick = async () => {
 async function loadCannedPicker() {
   try {
     const { canned } = await api('/api/canned');
-    $('cannedPick').innerHTML = '<option value="">⚡ رد جاهز</option>' + canned.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join('');
+    $('cannedPick').innerHTML = '<option value="">' + tr('⚡ رد جاهز') + '</option>' + canned.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join('');
   } catch {}
 }
 $('cannedPick').onchange = async () => {
@@ -713,11 +839,11 @@ async function loadMessages() {
       if (m.type === 'image' || m.type === 'sticker') mediaHtml = `<a href="${url}" target="_blank"><img src="${url}" style="max-width:240px;border-radius:6px;display:block" loading="lazy" /></a>`;
       else if (m.type === 'video') mediaHtml = `<video src="${url}" controls style="max-width:240px;border-radius:6px"></video>`;
       else if (m.type === 'audio' || m.type === 'voice') mediaHtml = `<audio src="${url}" controls></audio>`;
-      else mediaHtml = `<a href="${url}" target="_blank" style="color:#53bdeb">📎 ${m.filename || 'مستند مرفق'}</a>`;
+      else mediaHtml = `<a href="${url}" target="_blank" style="color:var(--info)">📎 ${m.filename || tr('مستند مرفق')}</a>`;
     } else if (m.type !== 'text') {
-      mediaHtml = `<span style="color:#8696a0">[${m.type}]</span> `;
+      mediaHtml = `<span style="color:var(--muted)">[${m.type}]</span> `;
     }
-    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">🤖 بوت</span> ' : ''}${m.sender ? `<span style="color:#b47bde">${m.sender}</span> ` : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    div.innerHTML = `${mediaHtml}${m.body ? `<div>${m.body}</div>` : ''}<div class="meta">${m.bot ? '<span class="bot-tag">' + tr('🤖 بوت') + '</span> ' : ''}${m.sender ? `<span style="color:var(--purple)">${m.sender}</span> ` : ''}${fmtTime(m.created_at)}${statusMark(m)}</div>`;
     $('messages').appendChild(div);
   }
   $('messages').scrollTop = $('messages').scrollHeight;
@@ -732,7 +858,7 @@ $('composer').onsubmit = async (e) => {
   $('replyInput').value = $('replyMediaUrl').value = '';
   try {
     await api(`/api/conversations/${currentWaId}/reply`, { body: { body, media_url: media_type ? media_url : '', media_type } });
-  } catch (err) { alert('فشل الإرسال: ' + err.message); }
+  } catch (err) { alert(tr('فشل الإرسال: ') + err.message); }
   await loadMessages();
   loadConvos();
 };
@@ -747,10 +873,10 @@ async function loadTemplates() {
     for (const t of templates) {
       const bodyText = (t.components ?? []).find((c) => c.type === 'BODY')?.text ?? '';
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td style="font-size:12px;max-width:260px;white-space:pre-wrap">${esc(bodyText).slice(0, 120)}</td><td><span class="pill ${t.status}">${t.status}</span></td><td style="white-space:nowrap"><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="testTemplate('${t.name}', '${t.language}')">تجربة</button> <button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delTemplate('${t.name}')">حذف</button></td>`;
+      tr.innerHTML = `<td dir="ltr">${t.name}</td><td>${t.category}</td><td style="font-size:12px;max-width:260px;white-space:pre-wrap">${esc(bodyText).slice(0, 120)}</td><td><span class="pill ${t.status}">${statusLabel(t.status)}</span></td><td style="white-space:nowrap"><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="testTemplate('${t.name}', '${t.language}')">${tr('تجربة')}</button> <button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delTemplate('${t.name}')">${tr('حذف')}</button></td>`;
       tb.appendChild(tr);
     }
-    if (!templates.length) tb.innerHTML = '<tr><td colspan="5" style="color:#8696a0">لا توجد قوالب بعد</td></tr>';
+    if (!templates.length) tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' + tr('لا توجد قوالب بعد') + '</td></tr>';
   } catch (err) {
     $('tplErr').textContent = err.message;
     $('tplErr').style.display = 'block';
@@ -789,19 +915,19 @@ $('tplCreate').onclick = async () => {
 };
 
 async function delTemplate(name) {
-  if (!confirm(`حذف القالب ${name} نهائيًا من حساب واتساب؟`)) return;
+  if (!confirm(`${tr('حذف القالب')} ${name} ${tr('نهائيًا من حساب واتساب؟')}`)) return;
   await api(`/api/templates/${encodeURIComponent(name)}`, { method: 'DELETE' });
   loadTemplates();
 }
 window.delTemplate = delTemplate;
 
 async function testTemplate(name, lang) {
-  const to = prompt(`إرسال القالب ${name} تجريبيًا إلى رقم (بالصيغة الدولية بدون +):`, '966');
+  const to = prompt(`${tr('إرسال القالب')} ${name} ${tr('تجريبيًا إلى رقم (بالصيغة الدولية بدون +):')}`, '966');
   if (!to) return;
   try {
     await api('/api/templates/test', { body: { to, template_name: name, language_code: lang || 'ar' } });
-    alert('تم الإرسال ✓');
-  } catch (err) { alert('فشل الإرسال: ' + err.message); }
+    alert(tr('تم الإرسال ✓'));
+  } catch (err) { alert(tr('فشل الإرسال: ') + err.message); }
 }
 window.testTemplate = testTemplate;
 
@@ -813,7 +939,7 @@ async function loadApprovedTemplates() {
     approvedTpls = templates.filter((t) => t.status === 'APPROVED');
     const sel = $('campTemplate');
     sel.innerHTML = '';
-    if (!approvedTpls.length) sel.innerHTML = '<option value="">لا توجد قوالب معتمدة بعد</option>';
+    if (!approvedTpls.length) sel.innerHTML = '<option value="">' + tr('لا توجد قوالب معتمدة بعد') + '</option>';
     for (const t of approvedTpls) sel.innerHTML += `<option value="${t.name}" data-lang="${t.language}">${t.name} (${t.language})</option>`;
     renderCampTplPreview();
   } catch {}
@@ -829,8 +955,8 @@ function renderCampTplPreview() {
   prev.style.display = bodyText ? 'block' : 'none';
   const count = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
   if (count > 0) {
-    vars.innerHTML = '<label>قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)</label>' +
-      Array.from({ length: count }, (_, i) => `<input class="campVar" placeholder="قيمة {{${i + 1}}}" style="margin-bottom:6px" />`).join('');
+    vars.innerHTML = '<label>' + tr('قيم المتغيرات بالترتيب (تُرسل واحدة لكل رقم)') + '</label>' +
+      Array.from({ length: count }, (_, i) => `<input class="campVar" placeholder="${tr('قيمة')} {{${i + 1}}}" style="margin-bottom:6px" />`).join('');
   }
 }
 $('campTemplate').onchange = renderCampTplPreview;
@@ -841,37 +967,38 @@ async function loadCampaigns() {
   tb.innerHTML = '';
   for (const c of campaigns) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${c.status}</span></td><td style="font-size:12px">${c.scheduled_at ? fmtTime(c.scheduled_at) : '—'}</td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">التفاصيل</button></td>`;
+    tr.innerHTML = `<td>${c.name}</td><td dir="ltr">${c.template_name}</td><td>${c.total}</td><td>${c.sent}</td><td>${c.failed}</td><td><span class="pill ${c.status}">${statusLabel(c.status)}</span></td><td style="font-size:12px">${c.scheduled_at ? fmtTime(c.scheduled_at) : '—'}</td><td><button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="showCampaign(${c.id}, '${c.name.replace(/'/g, '')}')">${tr('التفاصيل')}</button></td>`;
     tb.appendChild(tr);
   }
-  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="8" style="color:#8696a0">لا توجد حملات بعد</td></tr>';
+  if (!campaigns.length) tb.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">' + tr('لا توجد حملات بعد') + '</td></tr>';
 }
 
 async function showCampaign(id, name) {
   const { recipients } = await api(`/api/campaigns/${id}`);
   $('campDetail').hidden = false;
-  $('campDetailTitle').textContent = 'مستلمو حملة: ' + name;
+  $('campDetailTitle').textContent = tr('مستلمو حملة') + ': ' + name;
   const tb = document.querySelector('#campRecTable tbody');
   tb.innerHTML = '';
   for (const r of recipients) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td dir="ltr">${r.wa_id}</td><td><span class="pill ${r.status}">${r.status}</span></td><td style="font-size:12px;color:#8696a0">${r.error || ''}</td>`;
+    tr.innerHTML = `<td dir="ltr">${r.wa_id}</td><td><span class="pill ${r.status}">${statusLabel(r.status)}</span></td><td style="font-size:12px;color:var(--muted)">${r.error || ''}</td>`;
     tb.appendChild(tr);
   }
 }
 window.showCampaign = showCampaign;
 
 let currentCampaignId = null;
+let currentCampaignName = '';
 const origShowCampaign = showCampaign;
-showCampaign = async (id, name) => { currentCampaignId = id; await origShowCampaign(id, name); };
+showCampaign = async (id, name) => { currentCampaignId = id; currentCampaignName = name; await origShowCampaign(id, name); };
 window.showCampaign = showCampaign;
 
 $('campRetry').onclick = async () => {
   if (!currentCampaignId) return;
   try {
     const r = await api(`/api/campaigns/${currentCampaignId}/retry-failed`, { body: {} });
-    alert(r.count ? `أُعيد إرسال ${r.count} رسالة فاشلة` : 'لا توجد رسائل فاشلة');
-    showCampaign(currentCampaignId, $('campDetailTitle').textContent.replace('مستلمو حملة: ', ''));
+    alert(r.count ? `${tr('أُعيد إرسال')} ${r.count} ${tr('رسالة فاشلة')}` : tr('لا توجد رسائل فاشلة'));
+    showCampaign(currentCampaignId, currentCampaignName);
     loadCampaigns();
   } catch (err) { alert(err.message); }
 };
@@ -899,7 +1026,7 @@ $('campCreate').onclick = async () => {
     $('campSchedule').value = '';
     loadCampaigns();
     setTimeout(loadCampaigns, 5000);
-    alert(scheduled_at ? `اتجدولت الحملة لـ ${r.total} رقم` : `بدأت الحملة لـ ${r.total} رقم`);
+    alert(scheduled_at ? `${tr('اتجدولت الحملة لـ')} ${r.total} ${tr('رقم')}` : `${tr('بدأت الحملة لـ')} ${r.total} ${tr('رقم')}`);
   } catch (err) {
     $('campErr').textContent = err.message;
     $('campErr').style.display = 'block';
@@ -913,10 +1040,10 @@ async function loadContacts() {
   tb.innerHTML = '';
   for (const c of contacts) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td dir="ltr">${c.phone}</td><td>${c.name || '—'}</td><td>${c.tags || '—'}</td><td><input type="checkbox" ${c.opted_out ? '' : 'checked'} onchange="toggleOptOut('${c.phone}', !this.checked)" /></td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delContact('${c.phone}')">حذف</button></td>`;
+    tr.innerHTML = `<td dir="ltr">${c.phone}</td><td>${c.name || '—'}</td><td>${c.tags || '—'}</td><td><input type="checkbox" ${c.opted_out ? '' : 'checked'} onchange="toggleOptOut('${c.phone}', !this.checked)" /></td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delContact('${c.phone}')">${tr('حذف')}</button></td>`;
     tb.appendChild(tr);
   }
-  if (!contacts.length) tb.innerHTML = '<tr><td colspan="5" style="color:#8696a0">لا توجد جهات اتصال بعد</td></tr>';
+  if (!contacts.length) tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' + tr('لا توجد جهات اتصال بعد') + '</td></tr>';
 }
 
 $('conImportBtn').onclick = async () => {
@@ -925,7 +1052,7 @@ $('conImportBtn').onclick = async () => {
     const r = await api('/api/contacts/import', { body: { text: $('conImport').value } });
     $('conImport').value = '';
     loadContacts();
-    alert(`تم استيراد/تحديث ${r.count} جهة اتصال`);
+    alert(`${tr('تم استيراد/تحديث')} ${r.count} ${tr('جهة اتصال')}`);
   } catch (err) {
     $('conErr').textContent = err.message;
     $('conErr').style.display = 'block';
@@ -952,17 +1079,17 @@ async function loadBot() {
   for (const r of rules) {
     const tr = document.createElement('tr');
     const opts = r.options ? (typeof r.options === 'string' ? JSON.parse(r.options) : r.options) : null;
-    tr.innerHTML = `<td>${r.type === 'menu' ? '📋 قائمة' : '💬 رد'}</td><td>${r.keyword}</td><td>${r.response}${opts ? '<br><span style="color:#8696a0;font-size:12px">' + opts.map((o) => o.key + ') ' + o.label).join(' — ') + '</span>' : ''}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">حذف</button></td>`;
+    tr.innerHTML = `<td>${r.type === 'menu' ? tr('📋 قائمة') : tr('💬 رد')}</td><td>${r.keyword}</td><td>${r.response}${opts ? '<br><span style="color:var(--muted);font-size:12px">' + opts.map((o) => o.key + ') ' + o.label).join(' — ') + '</span>' : ''}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delRule(${r.id})">${tr('حذف')}</button></td>`;
     tb.appendChild(tr);
   }
-  if (!rules.length) tb.innerHTML = '<tr><td colspan="4" style="color:#8696a0">لا توجد قواعد بعد</td></tr>';
+  if (!rules.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">' + tr('لا توجد قواعد بعد') + '</td></tr>';
   loadAfterHours();
 }
 
 $('ruleType').onchange = (e) => {
   const menu = e.target.value === 'menu';
   $('menuOptions').hidden = !menu;
-  $('ruleResponseLabel').textContent = menu ? 'نص يظهر فوق الخيارات' : 'يرد بـ';
+  $('ruleResponseLabel').textContent = menu ? tr('نص يظهر فوق الخيارات') : tr('يرد بـ');
 };
 
 async function loadAfterHours() {
@@ -976,7 +1103,7 @@ async function loadAfterHours() {
 
 $('ahSave').onclick = async () => {
   await api('/api/bot/after-hours', { body: { enabled: $('ahEnabled').checked, work_start: $('ahStart').value.trim(), work_end: $('ahEnd').value.trim(), work_days: $('ahDays').value.trim(), message: $('ahMessage').value } });
-  alert('تم حفظ إعدادات خارج الدوام');
+  alert(tr('تم حفظ إعدادات خارج الدوام'));
 };
 
 $('botGlobal').onchange = async (e) => { await api('/api/bot/toggle', { body: { enabled: e.target.checked } }); };
@@ -1006,20 +1133,20 @@ $('ruleAdd').onclick = async () => {
 // ===== التقارير =====
 async function loadReports() {
   const r = await api('/api/reports/summary');
-  const card = (t, v) => `<div class="card" style="min-width:130px;margin:0"><h3 style="margin-bottom:4px">${t}</h3><div style="font-size:22px;font-weight:700">${v ?? 0}</div></div>`;
+  const card = (t, v) => `<div class="card"><h3>${t}</h3><div class="stat-num">${v ?? 0}</div></div>`;
   $('repCards').innerHTML =
-    card('رسائل واردة', r.totals.inbound) + card('رسائل صادرة', r.totals.outbound) +
-    card('ردود البوت', r.totals.bot_replies) + card('جهات الاتصال', r.contacts.total) +
-    card('ألغوا الاشتراك', r.contacts.opted_out) + card('حملات', r.campaigns.total) +
-    card('رسائل حملات ناجحة', r.recipients.sent) + card('فاشلة', r.recipients.failed);
+    card(tr('رسائل واردة'), r.totals.inbound) + card(tr('رسائل صادرة'), r.totals.outbound) +
+    card(tr('ردود البوت'), r.totals.bot_replies) + card(tr('جهات الاتصال'), r.contacts.total) +
+    card(tr('ألغوا الاشتراك'), r.contacts.opted_out) + card(tr('حملات'), r.campaigns.total) +
+    card(tr('رسائل حملات ناجحة'), r.recipients.sent) + card(tr('فاشلة'), r.recipients.failed);
   const tb = document.querySelector('#repTable tbody');
   tb.innerHTML = '';
   for (const d of r.perDay) tb.innerHTML += `<tr><td dir="ltr">${d.day}</td><td>${d.inbound}</td><td>${d.outbound}</td></tr>`;
-  if (!r.perDay.length) tb.innerHTML = '<tr><td colspan="3" style="color:#8696a0">لا رسائل بعد</td></tr>';
+  if (!r.perDay.length) tb.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">' + tr('لا رسائل بعد') + '</td></tr>';
   const tp = document.querySelector('#repTop tbody');
   tp.innerHTML = '';
   for (const c of r.topConversations) tp.innerHTML += `<tr><td dir="ltr">${c.wa_id}</td><td>${c.messages}</td></tr>`;
-  if (!r.topConversations.length) tp.innerHTML = '<tr><td colspan="2" style="color:#8696a0">—</td></tr>';
+  if (!r.topConversations.length) tp.innerHTML = '<tr><td colspan="2" style="color:var(--muted)">—</td></tr>';
   loadWebhookCard();
 }
 
@@ -1027,11 +1154,11 @@ async function loadWebhookCard() {
   try {
     const w = await api('/api/webhook-events');
     $('whStatus').innerHTML = w.last_inbound_at
-      ? `<span style="color:#00a884">✓ الـ Webhook يستلم — آخر رسالة واردة: ${fmtTime(w.last_inbound_at)}</span>`
-      : `<span style="color:#e0a800">⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.</span>`;
+      ? `<span style="color:var(--ok)">${tr('✓ الـ Webhook يستلم — آخر رسالة واردة: ')}${fmtTime(w.last_inbound_at)}</span>`
+      : `<span style="color:var(--warn)">${tr('⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.')}</span>`;
     const tb = document.querySelector('#whEvents tbody');
-    tb.innerHTML = w.events.map((e) => `<tr><td dir="ltr" style="white-space:nowrap">${fmtTime(e.created_at)}</td><td>${e.kind === 'message' ? 'رسالة' : 'حالة'}</td><td dir="ltr" style="font-size:12px">${esc(e.summary || '')}</td></tr>`).join('')
-      || '<tr><td colspan="3" style="color:#8696a0">لا أحداث بعد</td></tr>';
+    tb.innerHTML = w.events.map((e) => `<tr><td dir="ltr" style="white-space:nowrap">${fmtTime(e.created_at)}</td><td>${e.kind === 'message' ? tr('رسالة') : tr('حالة')}</td><td dir="ltr" style="font-size:12px">${esc(e.summary || '')}</td></tr>`).join('')
+      || '<tr><td colspan="3" style="color:var(--muted)">' + tr('لا أحداث بعد') + '</td></tr>';
   } catch {}
 }
 window.loadWebhookCard = loadWebhookCard;
@@ -1045,10 +1172,10 @@ async function loadKeys() {
     tb.innerHTML = '';
     for (const k of keys) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${k.label}</td><td style="font-size:12px">${fmtTime(k.created_at)}</td><td style="font-size:12px">${k.last_used_at ? fmtTime(k.last_used_at) : 'لم يستخدم'}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delKey(${k.id})">حذف</button></td>`;
+      tr.innerHTML = `<td>${k.label}</td><td style="font-size:12px">${fmtTime(k.created_at)}</td><td style="font-size:12px">${k.last_used_at ? fmtTime(k.last_used_at) : tr('لم يستخدم')}</td><td><button class="btn danger" style="padding:4px 12px;font-size:12px" onclick="delKey(${k.id})">${tr('حذف')}</button></td>`;
       tb.appendChild(tr);
     }
-    if (!keys.length) tb.innerHTML = '<tr><td colspan="4" style="color:#8696a0">لا مفاتيح بعد</td></tr>';
+    if (!keys.length) tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">' + tr('لا مفاتيح بعد') + '</td></tr>';
   } catch {}
 }
 window.loadKeys = loadKeys;
@@ -1057,7 +1184,7 @@ $('keyCreate').onclick = async () => {
   $('keyErr').style.display = 'none';
   try {
     const r = await api('/api/keys', { body: { label: $('keyLabel').value.trim() } });
-    $('keyResult').textContent = 'المفتاح (يظهر مرة واحدة): ' + r.key;
+    $('keyResult').textContent = tr('المفتاح (يظهر مرة واحدة): ') + r.key;
     $('keyLabel').value = '';
     loadKeys();
   } catch (err) {
@@ -1074,13 +1201,13 @@ async function delRule(id) { await api(`/api/bot/rules/${id}`, { method: 'DELETE
 async function loadCanned() {
   const { canned } = await api('/api/canned');
   const tb = document.querySelector('#cnTable tbody');
-  tb.innerHTML = canned.map((c) => `<tr><td>${esc(c.title)}</td><td>${esc(c.body)}</td><td><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delCanned(${c.id})">حذف</button></td></tr>`).join('')
-    || '<tr><td colspan="3" style="color:#8696a0">لا ردود جاهزة بعد</td></tr>';
+  tb.innerHTML = canned.map((c) => `<tr><td>${esc(c.title)}</td><td>${esc(c.body)}</td><td><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delCanned(${c.id})">${tr('حذف')}</button></td></tr>`).join('')
+    || '<tr><td colspan="3" style="color:var(--muted)">' + tr('لا ردود جاهزة بعد') + '</td></tr>';
 }
 $('cnAdd').onclick = async () => {
   const title = $('cnTitle').value.trim();
   const body = $('cnBody').value.trim();
-  if (!title || !body) return alert('العنوان والنص مطلوبان');
+  if (!title || !body) return alert(tr('العنوان والنص مطلوبان'));
   await api('/api/canned', { body: { title, body } });
   $('cnTitle').value = $('cnBody').value = '';
   loadCanned();
@@ -1096,7 +1223,7 @@ async function loadWelcome() {
 }
 $('wcSave').onclick = async () => {
   await api('/api/bot/welcome', { body: { enabled: $('wcEnabled').checked, message: $('wcMessage').value } });
-  alert('تم حفظ رسالة الترحيب');
+  alert(tr('تم حفظ رسالة الترحيب'));
 };
 window.delRule = delRule;
 
