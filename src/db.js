@@ -218,6 +218,8 @@ SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assig
   console.error('فشلت ترقية جدول المحادثات:', e.message);
 }
 try { db.exec(`ALTER TABLE messages ADD COLUMN phone_number_id TEXT`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN retry_count INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN next_retry_at INTEGER`); } catch {}
 try {
   const defId = defaultPhoneNumberId();
   if (defId) db.prepare(`UPDATE messages SET phone_number_id = ? WHERE phone_number_id IS NULL`).run(defId);
@@ -282,6 +284,33 @@ export function upsertInbound({ waId, phoneNumberId = null, name, waMessageId, t
        last_message_at = excluded.last_message_at,
        unread = conversations.unread + 1`
   ).run(waId, pn, name ?? null, body ?? `[${type}]`, t);
+}
+
+// ===== إعادة إرسال الرسائل الفاشلة =====
+
+export function failedForRetry(now = nowMs()) {
+  return db.prepare(`SELECT * FROM messages WHERE direction = 'outbound' AND status = 'failed'
+    AND COALESCE(retry_count, 0) < 3 AND (next_retry_at IS NULL OR next_retry_at <= ?)`).all(now);
+}
+
+export function markRetryScheduled(id, retryCount, nextRetryAt) {
+  db.prepare('UPDATE messages SET retry_count = ?, next_retry_at = ? WHERE id = ?').run(retryCount, nextRetryAt, id);
+}
+
+export function markRetrySucceeded(id, waMessageId) {
+  db.prepare(`UPDATE messages SET status = 'sent', wa_message_id = ?, retry_count = retry_count + 1, next_retry_at = NULL WHERE id = ?`).run(waMessageId, id);
+}
+
+// نسخة احتياطية كاملة من كل البيانات (بدون كلمات مرور الموظفين)
+export function fullBackup() {
+  const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all();
+  const out = { exported_at: new Date().toISOString(), tables: {} };
+  for (const { name } of tables) {
+    const rows = db.prepare(`SELECT * FROM "${name}"`).all();
+    if (name === 'agents') for (const r of rows) delete r.pass_hash;
+    out.tables[name] = rows;
+  }
+  return out;
 }
 
 export function insertOutbound({ waId, phoneNumberId = null, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null, sender = null, quotedWaId = null }) {

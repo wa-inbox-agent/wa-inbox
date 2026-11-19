@@ -75,6 +75,10 @@ import {
   logWebhookEvent,
   recentWebhookEvents,
   resetFailedRecipients,
+  failedForRetry,
+  markRetryScheduled,
+  markRetrySucceeded,
+  fullBackup,
 } from './db.js';
 import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -157,12 +161,31 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// قفل مؤقت بعد محاولات دخول فاشلة متكررة
+const loginAttempts = new Map(); // username -> { count, lockedUntil }
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCK_MS = 10 * 60 * 1000;
+
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body ?? {};
-  const agent = getAgentByUsername(String(username ?? '').trim());
+  const uname = String(username ?? '').trim();
+  const att = loginAttempts.get(uname);
+  if (att?.lockedUntil && att.lockedUntil > Date.now()) {
+    const mins = Math.ceil((att.lockedUntil - Date.now()) / 60000);
+    return res.status(429).json({ error: `تم قفل الحساب مؤقتًا بسبب محاولات دخول فاشلة متكررة. حاول بعد ${mins} دقيقة.` });
+  }
+  const agent = getAgentByUsername(uname);
   if (!agent || !agent.active || !verifyPassword(String(password ?? ''), agent.pass_hash)) {
+    const cur = loginAttempts.get(uname) ?? { count: 0, lockedUntil: 0 };
+    cur.count += 1;
+    if (cur.count >= LOGIN_MAX_ATTEMPTS) {
+      cur.lockedUntil = Date.now() + LOGIN_LOCK_MS;
+      cur.count = 0;
+    }
+    loginAttempts.set(uname, cur);
     return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
   }
+  loginAttempts.delete(uname);
   res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(signSession(agent.id))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
   res.json({ ok: true, agent: { id: agent.id, username: agent.username, name: agent.name, role: agent.role } });
 });
@@ -423,6 +446,15 @@ app.get('/api/agents/stats', requireAdmin, (req, res) => {
 });
 
 // ملخص اليوم للمدير
+// تنزيل نسخة احتياطية كاملة من البيانات (للمدير فقط)
+app.get('/api/admin/backup', requireAdmin, (req, res) => {
+  const data = fullBackup();
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="wa-inbox-backup-${stamp}.json"`);
+  res.send(JSON.stringify(data, null, 2));
+});
+
 app.get('/api/admin/daily-summary', requireAdmin, (req, res) => {
   res.json(dailyAdminSummary());
 });
@@ -702,6 +734,39 @@ app.post('/api/campaigns/:id/start', (req, res) => {
 setInterval(() => {
   for (const c of dueCampaigns()) runCampaign(c.id);
 }, 20000);
+
+// إعادة محاولة إرسال الرسائل الفاشلة تلقائيًا (3 محاولات: دقيقة، 5 دقائق، 15 دقيقة)
+const RETRY_DELAYS = [60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
+setInterval(async () => {
+  let failed;
+  try { failed = failedForRetry(); } catch { return; }
+  for (const msg of failed) {
+    const pn = msg.phone_number_id || defaultPhoneNumberId();
+    if (!pn) { markRetryScheduled(msg.id, 3, null); continue; }
+    try {
+      let result = null;
+      if (msg.type === 'text' && msg.body) {
+        result = await sendText(msg.wa_id, msg.body, pn);
+      } else if (msg.media_id && ['image', 'document', 'audio', 'video'].includes(msg.type)) {
+        result = await sendMediaId(msg.wa_id, msg.type, msg.media_id, msg.body || null, pn);
+      } else {
+        markRetryScheduled(msg.id, 3, null); continue; // قوالب وأنواع أخرى لا تُعاد تلقائيًا
+      }
+      const waId = result?.messages?.[0]?.id;
+      if (waId) {
+        markRetrySucceeded(msg.id, waId);
+        console.log(`أُعيد إرسال الرسالة ${msg.id} إلى ${msg.wa_id} بنجاح`);
+      } else {
+        throw new Error('لا يوجد معرف رسالة');
+      }
+    } catch (e) {
+      const count = (msg.retry_count || 0) + 1;
+      const delay = RETRY_DELAYS[Math.min(count - 1, RETRY_DELAYS.length - 1)];
+      markRetryScheduled(msg.id, count, Date.now() + delay);
+      console.error(`فشلت إعادة إرسال الرسالة ${msg.id} (محاولة ${count}): ${e.message}`);
+    }
+  }
+}, 60000);
 
 // ---------- جهات الاتصال ----------
 
