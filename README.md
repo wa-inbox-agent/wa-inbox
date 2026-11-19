@@ -1,0 +1,120 @@
+# صندوق وارد واتساب (WA Inbox)
+
+المرحلة الأولى من منصة واتساب للأعمال الخاصة بك (مثل WATI و respond.io) مبنية على **WhatsApp Business Platform (Cloud API)** من ميتا.
+
+## ماذا يفعل المشروع الآن؟
+
+- ربط الـ Webhook مع ميتا (التحقق + استقبال الرسائل).
+- استقبال الرسائل الواردة من العملاء وتخزينها في قاعدة بيانات SQLite محلية.
+- تتبع حالات الرسائل الصادرة (تم الإرسال / التسليم / القراءة).
+- صندوق وارد ويب بالعربية (RTL) لقراءة المحادثات والرد عليها.
+- كل المفاتيح والأسرار تُقرأ من متغيرات البيئة (ملف `.env`) ولا تُكتب في الكود.
+
+## المتطلبات
+
+- Node.js الإصدار **22.5 أو أحدث** (يستخدم SQLite المدمج، بدون تثبيت أي قاعدة خارجية).
+- حساب Meta Business موثّق + تطبيق على [developers.facebook.com](https://developers.facebook.com) مع منتج WhatsApp مفعّل.
+- رقم هاتف مربوط بحساب واتساب للأعمال (WABA).
+
+## خطوات الإعداد في ميتا
+
+### 1) تفعيل WhatsApp في التطبيق
+1. افتح تطبيقك في [Meta for Developers](https://developers.facebook.com/apps).
+2. من القائمة الجانبية اختر **Add Product** ثم **WhatsApp → Set up**.
+3. من صفحة **API Setup** ستجد:
+   - **Phone number ID**
+   - **WhatsApp Business Account ID (WABA ID)**
+
+### 2) إنشاء رمز وصول دائم (Access Token)
+رمز الاختبار المؤقت ينتهي خلال 24 ساعة، لذلك أنشئ رمزًا دائمًا:
+1. افتح [Meta Business Settings](https://business.facebook.com/settings) → **Users → System Users**.
+2. أنشئ **System User** بصلاحية Admin.
+3. اضغط **Add Assets** → **Apps** → اختر تطبيقك → فعّل **Manage App**.
+4. اضغط **Generate New Token** → اختر تطبيقك وفعّل الصلاحيات:
+   - `whatsapp_business_messaging`
+   - `whatsapp_business_management`
+5. انسخ الرمز واحتفظ به (لن يظهر كاملًا مرة أخرى).
+
+### 3) تشغيل المشروع محليًا
+```bash
+cd wa-inbox
+npm install
+cp .env.example .env
+# عدّل .env واملأ: PHONE_NUMBER_ID, WABA_ID, WHATSAPP_TOKEN, VERIFY_TOKEN
+npm start
+```
+ثم افتح http://localhost:3000 في المتصفح.
+
+### 4) إتاحة الخادم على الإنترنت (للـ Webhook) — مجانًا بـ Cloudflare Tunnel
+ميتا تحتاج رابط HTTPS عامًا. أثناء التطوير نستخدم **نفق Cloudflare** المجاني (بدون حساب):
+1. نزّل `cloudflared` من https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+2. شغّل المشروع (`npm start`) ثم في نافذة ثانية:
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+3. سيعطيك رابطًا مثل `https://something-random.trycloudflare.com` — هذا هو رابطك العام.
+> ملاحظة: الرابط يتغير في كل مرة تشغّل فيها النفق، فستحدّث الـ Callback URL في ميتا عند كل تشغيل أثناء التطوير فقط. بعد الانتقال لخادم ثابت لن تحتاج النفق.
+> (بديل سريع: `ngrok http 3000` يعطيك رابطًا عامًا بالطريقة نفسها.)
+
+### 5) ربط الـ Webhook
+1. في صفحة تطبيقك اذهب إلى **WhatsApp → Configuration**.
+2. في قسم **Webhook** اضغط **Edit**:
+   - **Callback URL:** `https://something-random.trycloudflare.com/webhook` (الرابط الذي أعطاه لك cloudflared + `/webhook`)
+   - **Verify Token:** نفس قيمة `VERIFY_TOKEN` في ملف `.env`
+3. اضغط **Verify and Save**.
+4. في **Webhook fields** فعّل الاشتراك في حقل **messages**.
+
+### 6) الانتقال لخادم (VPS) بعد التأكد
+عندما يعمل كل شيء، انقل المشروع لأي استضافة:
+1. احجز خادمًا (أي VPS بسيط يكفي) وثبّت عليه **Node.js 22+**.
+2. ارفع المشروع وشغّل:
+```bash
+npm install
+cp .env.example .env   # واملأ القيم
+npm start
+```
+3. للتشغيل الدائم استخدم systemd أو `pm2`:
+```bash
+npm install -g pm2
+pm2 start src/server.js --name wa-inbox
+pm2 save && pm2 startup
+```
+4. اربط دومين بالخادم وشغّل HTTPS عبر **Caddy** (شهادة تلقائية) أو nginx + Let's Encrypt، ووجّه الدومين للمنفذ 3000.
+5. حدّث الـ **Callback URL** في ميتا لرابط الدومين الثابت: `https://wa.yourdomain.com/webhook`.
+
+### 7) التجربة
+- أرسل رسالة واتساب من أي رقم إلى رقم الأعمال، وستظهر فورًا في صندوق الوارد.
+- اكتب ردًا من الواجهة وسيصل للعميل على واتساب.
+
+> ملاحظة مهمة: الرد الحر على العميل متاح فقط خلال **24 ساعة** من آخر رسالة وصلت منه (نافذة خدمة العملاء). بعدها يجب الإرسال بقوالب معتمدة (Message Templates) — وهذه خطوة المرحلة التالية.
+
+## بنية المشروع
+```
+wa-inbox/
+├── src/
+│   ├── server.js     # الخادم: الـ Webhook + واجهات API
+│   ├── whatsapp.js   # الإرسال عبر Graph API
+│   └── db.js         # قاعدة SQLite (المحادثات والرسائل)
+├── public/
+│   └── index.html    # صندوق الوارد (عربي RTL)
+├── .env.example      # نموذج الإعدادات
+└── data/             # تُنشأ تلقائيًا: ملف قاعدة البيانات
+```
+
+## واجهات API
+
+| الطريقة | المسار | الوظيفة |
+|---|---|---|
+| GET | `/webhook` | التحقق من الـ Webhook مع ميتا |
+| POST | `/webhook` | استقبال الرسائل وتحديثات الحالة |
+| GET | `/api/conversations` | قائمة المحادثات |
+| GET | `/api/conversations/:waId/messages` | رسائل محادثة (ويمسح عدّاد غير المقروء) |
+| POST | `/api/conversations/:waId/reply` | إرسال رد نصي: `{"body": "..."}` |
+| GET | `/api/health` | حالة الخادم واكتمال الإعدادات |
+
+## أفكار المراحل القادمة
+- إرسال القوالب المعتمدة (Templates) خارج نافذة الـ 24 ساعة.
+- استقبال وإرسال الوسائط (صور، مستندات، صوت).
+- عدة موظفين على نفس الرقم، وتعيين المحادثات.
+- ردود آلية وقوائم تفاعلية (Buttons / Lists).
+- تقارير وحملات broadcast.

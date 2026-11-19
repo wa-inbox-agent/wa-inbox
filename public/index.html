@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>صندوق وارد واتساب</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: #0b141a; color: #e9edef;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: #202c33; padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 17px;
+  }
+  #health { font-size: 12px; font-weight: 400; margin-inline-start: auto; }
+  #health.ok { color: #00a884; } #health.bad { color: #f15c6d; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #convos {
+    width: 320px; min-width: 260px; background: #111b21;
+    border-inline-end: 1px solid #222d34; overflow-y: auto;
+  }
+  .convo {
+    padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #1f2c33;
+  }
+  .convo:hover, .convo.active { background: #2a3942; }
+  .convo .name { font-weight: 600; display: flex; justify-content: space-between; }
+  .convo .badge {
+    background: #00a884; color: #111b21; border-radius: 10px;
+    font-size: 11px; padding: 1px 7px; font-weight: 700;
+  }
+  .convo .preview {
+    color: #8696a0; font-size: 13px; margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chatHeader { background: #202c33; padding: 10px 16px; font-weight: 600; }
+  #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .msg {
+    max-width: 65%; padding: 8px 12px; border-radius: 8px;
+    font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.inbound { background: #202c33; align-self: flex-start; }
+  .msg.outbound { background: #005c4b; align-self: flex-end; }
+  .msg .meta { font-size: 11px; color: #8696a0; margin-top: 4px; text-align: left; direction: ltr; }
+  .msg .status-read { color: #53bdeb; }
+  #composer {
+    display: flex; gap: 8px; padding: 10px 16px; background: #202c33;
+  }
+  #composer input {
+    flex: 1; background: #2a3942; border: none; border-radius: 8px;
+    padding: 12px; color: #e9edef; font-size: 15px; outline: none;
+  }
+  #composer button {
+    background: #00a884; color: #111b21; border: none; border-radius: 8px;
+    padding: 0 22px; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  #composer button:disabled { opacity: .5; cursor: default; }
+  #empty {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    color: #8696a0; font-size: 16px;
+  }
+  @media (max-width: 700px) { #convos { width: 100%; } #chat { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  💬 صندوق وارد واتساب
+  <span id="health">...</span>
+</header>
+<main>
+  <div id="convos"></div>
+  <div id="chat">
+    <div id="empty">اختر محادثة من القائمة</div>
+    <div id="chatHeader" hidden></div>
+    <div id="messages" hidden></div>
+    <form id="composer" hidden>
+      <input id="replyInput" placeholder="اكتب رسالة..." autocomplete="off" />
+      <button type="submit">إرسال</button>
+    </form>
+  </div>
+</main>
+<script>
+let currentWaId = null;
+const convosEl = document.getElementById('convos');
+const messagesEl = document.getElementById('messages');
+const chatHeader = document.getElementById('chatHeader');
+const composer = document.getElementById('composer');
+const replyInput = document.getElementById('replyInput');
+const emptyEl = document.getElementById('empty');
+
+const fmtTime = (ms) => new Date(ms).toLocaleString('ar', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+const statusMark = (m) => {
+  if (m.direction !== 'outbound') return '';
+  const marks = { sent: '✓', delivered: '✓✓', read: '✓✓', failed: '✗' };
+  const cls = m.status === 'read' ? 'status-read' : '';
+  return ` <span class="${cls}">${marks[m.status] || ''}</span>`;
+};
+
+async function loadHealth() {
+  try {
+    const h = await (await fetch('/api/health')).json();
+    const el = document.getElementById('health');
+    el.textContent = h.configured ? 'متصل' : 'الإعدادات ناقصة (راجع .env)';
+    el.className = h.configured ? 'ok' : 'bad';
+  } catch {}
+}
+
+async function loadConvos() {
+  const { conversations } = await (await fetch('/api/conversations')).json();
+  convosEl.innerHTML = '';
+  for (const c of conversations) {
+    const div = document.createElement('div');
+    div.className = 'convo' + (c.wa_id === currentWaId ? ' active' : '');
+    div.innerHTML = `
+      <div class="name"><span>${c.name || c.wa_id}</span>${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
+      <div class="preview">${c.last_message || ''}</div>`;
+    div.onclick = () => openConvo(c.wa_id, c.name);
+    convosEl.appendChild(div);
+  }
+}
+
+async function openConvo(waId, name) {
+  currentWaId = waId;
+  emptyEl.hidden = true;
+  chatHeader.hidden = messagesEl.hidden = composer.hidden = false;
+  chatHeader.textContent = (name || waId) + ' — ' + waId;
+  await loadMessages();
+  loadConvos();
+}
+
+async function loadMessages() {
+  if (!currentWaId) return;
+  const { messages } = await (await fetch(`/api/conversations/${currentWaId}/messages`)).json();
+  messagesEl.innerHTML = '';
+  for (const m of messages) {
+    const div = document.createElement('div');
+    div.className = `msg ${m.direction}`;
+    div.innerHTML = `${m.body || `[${m.type}]`}<div class="meta">${fmtTime(m.created_at)}${statusMark(m)}</div>`;
+    messagesEl.appendChild(div);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+composer.onsubmit = async (e) => {
+  e.preventDefault();
+  const body = replyInput.value.trim();
+  if (!body || !currentWaId) return;
+  replyInput.value = '';
+  const res = await fetch(`/api/conversations/${currentWaId}/reply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert('فشل الإرسال: ' + (err.error || res.status));
+  }
+  await loadMessages();
+  loadConvos();
+};
+
+loadHealth();
+loadConvos();
+setInterval(() => { loadConvos(); loadMessages(); }, 5000);
+</script>
+</body>
+</html>

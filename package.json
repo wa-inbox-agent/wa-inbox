@@ -1,0 +1,17 @@
+{
+  "name": "wa-inbox",
+  "version": "0.1.0",
+  "description": "منصة واتساب للأعمال: استقبال وإرسال الرسائل عبر WhatsApp Cloud API مع صندوق وارد عربي",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
