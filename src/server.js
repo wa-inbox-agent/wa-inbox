@@ -22,6 +22,7 @@ import {
   pendingRecipients,
   markRecipient,
   dueCampaigns,
+  getMessage,
   upsertContact,
   listContacts,
   setContactOptOut,
@@ -29,7 +30,8 @@ import {
   isOptedOut,
   phonesForTag,
 } from './db.js';
-import { sendText, sendTemplate, listTemplates, createTemplate } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate } from './whatsapp.js';
+import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -95,6 +97,7 @@ app.post('/webhook', (req, res) => {
             const contacts = value.contacts ?? [];
             for (const msg of value.messages) {
               const contact = contacts.find((c) => c.wa_id === msg.from);
+              const mediaObj = ['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type) ? msg[msg.type] : null;
               upsertInbound({
                 waId: msg.from,
                 name: contact?.profile?.name ?? null,
@@ -102,6 +105,9 @@ app.post('/webhook', (req, res) => {
                 type: msg.type,
                 body: msg.text?.body ?? msg[msg.type]?.caption ?? null,
                 ts: msg.timestamp ? Number(msg.timestamp) * 1000 : undefined,
+                mediaId: mediaObj?.id ?? null,
+                mimeType: mediaObj?.mime_type ?? null,
+                filename: mediaObj?.filename ?? null,
               });
               upsertContact({ phone: msg.from, name: contact?.profile?.name ?? null });
               const inboundText = msg.text?.body?.trim() ?? '';
@@ -135,13 +141,45 @@ app.get('/api/conversations/:waId/messages', (req, res) => {
 app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
   const waId = req.params.waId;
   const body = String(req.body?.body ?? '').trim();
-  if (!body) return res.status(400).json({ error: 'نص الرسالة فارغ' });
+  const mediaUrl = String(req.body?.media_url ?? '').trim();
+  const mediaType = String(req.body?.media_type ?? 'image');
+  if (!body && !mediaUrl) return res.status(400).json({ error: 'نص الرسالة أو رابط الميديا مطلوب' });
 
-  const result = await sendText(waId, body);
-  insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body });
+  let result;
+  if (mediaUrl) {
+    if (!/^https:\/\//.test(mediaUrl)) return res.status(400).json({ error: 'رابط الميديا لازم يبدأ بـ https://' });
+    result = await sendMedia(waId, mediaType, mediaUrl, body || null);
+    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body: body || null, type: mediaType, mediaId: mediaUrl });
+  } else {
+    result = await sendText(waId, body);
+    insertOutbound({ waId, waMessageId: result?.messages?.[0]?.id, body });
+  }
   // تدخل بشري: نوقف البوت عن هذه المحادثة حتى يعاد تفعيله يدويًا
   setConversationBot(waId, false);
   res.json({ ok: true, result });
+}));
+
+// عرض/تحميل ميديا رسالة (صور ومستندات واردة أو روابط صادرة)
+const mediaDir = path.join(process.cwd(), 'data', 'media');
+mkdirSync(mediaDir, { recursive: true });
+app.get('/api/media/:messageId', wrap(async (req, res) => {
+  const msg = getMessage(Number(req.params.messageId));
+  if (!msg || !msg.media_id) return res.status(404).json({ error: 'لا توجد ميديا لهذه الرسالة' });
+
+  // رسالة صادرة برابط عام: نوجّه للرابط مباشرة
+  if (msg.direction === 'outbound' && /^https:\/\//.test(msg.media_id)) return res.redirect(msg.media_id);
+
+  const cachePath = path.join(mediaDir, String(msg.id));
+  if (!existsSync(cachePath)) {
+    const url = await getMediaUrl(msg.media_id);
+    if (!url) return res.status(404).json({ error: 'رابط الميديا غير متاح' });
+    const { buf, contentType } = await downloadMedia(url);
+    writeFileSync(cachePath, buf);
+    writeFileSync(cachePath + '.ct', contentType ?? 'application/octet-stream');
+  }
+  res.setHeader('Content-Type', existsSync(cachePath + '.ct') ? readFileSync(cachePath + '.ct', 'utf8') : 'application/octet-stream');
+  if (msg.filename) res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(msg.filename)}`);
+  createReadStream(cachePath).pipe(res);
 }));
 
 // تفعيل/إيقاف البوت لمحادثة واحدة
@@ -205,7 +243,7 @@ app.get('/api/campaigns/:id', (req, res) => {
 });
 
 app.post('/api/campaigns', (req, res) => {
-  const { name, template_name, language_code, numbers, tag, scheduled_at } = req.body ?? {};
+  const { name, template_name, language_code, numbers, tag, scheduled_at, header_link, header_type } = req.body ?? {};
   let cleaned = [...new Set(
     String(numbers ?? '')
       .split(/[\s,;]+/)
@@ -218,7 +256,7 @@ app.post('/api/campaigns', (req, res) => {
     return res.status(400).json({ error: 'اسم الحملة والقالب وقائمة الأرقام (أو قسم مشتركين) مطلوبة' });
   }
   const sched = scheduled_at ? Number(scheduled_at) : null;
-  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched });
+  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null });
   res.json({ ok: true, id, total: cleaned.length, scheduled: Boolean(sched) });
 });
 
@@ -237,7 +275,8 @@ async function runCampaign(id) {
         continue;
       }
       try {
-        const result = await sendTemplate(r.wa_id, data.campaign.template_name, data.campaign.language_code);
+        const header = data.campaign.header_link ? { link: data.campaign.header_link, type: data.campaign.header_type ?? 'image' } : null;
+        const result = await sendTemplateEx(r.wa_id, data.campaign.template_name, data.campaign.language_code, header);
         markRecipient(r.id, { status: 'sent', waMessageId: result?.messages?.[0]?.id ?? null });
       } catch (err) {
         markRecipient(r.id, { status: 'failed', error: err.message });

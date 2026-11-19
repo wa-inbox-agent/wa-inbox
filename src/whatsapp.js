@@ -84,3 +84,48 @@ export async function createTemplate({ name, category, language, body }) {
     },
   });
 }
+
+// جلب رابط تحميل ميديا واردة من ميتا
+export async function getMediaUrl(mediaId) {
+  requireCreds('WHATSAPP_TOKEN');
+  const data = await graph(`${mediaId}`);
+  return data?.url;
+}
+
+// تحميل محتوى الميديا (الباينري)
+export async function downloadMedia(url) {
+  requireCreds('WHATSAPP_TOKEN');
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  if (!res.ok) throw new Error(`فشل تحميل الميديا: HTTP ${res.status}`);
+  return { buf: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') };
+}
+
+// إرسال ميديا برابط عام (داخل نافذة الـ 24 ساعة): image/document/audio/video
+export async function sendMedia(to, type, link, caption = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  const media = { link };
+  if (caption && (type === 'image' || type === 'video' || type === 'document')) media.caption = caption;
+  const data = await graph(`${PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    body: { messaging_product: 'whatsapp', to, type, [type]: media },
+  });
+  return data;
+}
+
+// إرسال قالب مع هيدر ميديا اختياري (رابط صورة/مستند)
+export async function sendTemplateEx(to, templateName, languageCode = 'ar', header = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  const components = [];
+  if (header?.link && header?.type) {
+    const param = { type: header.type };
+    param[header.type] = { link: header.link };
+    components.push({ type: 'header', parameters: [param] });
+  }
+  const template = { name: templateName, language: { code: languageCode } };
+  if (components.length) template.components = components;
+  const data = await graph(`${PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    body: { messaging_product: 'whatsapp', to, type: 'template', template },
+  });
+  return data;
+}

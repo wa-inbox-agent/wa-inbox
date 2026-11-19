@@ -79,15 +79,20 @@ try { db.exec(`ALTER TABLE conversations ADD COLUMN bot_enabled INTEGER NOT NULL
 try { db.exec(`ALTER TABLE messages ADD COLUMN bot INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { db.exec(`INSERT OR IGNORE INTO bot_settings (id, enabled) VALUES (1, 1)`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN scheduled_at INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN media_id TEXT`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN mime_type TEXT`); } catch {}
+try { db.exec(`ALTER TABLE messages ADD COLUMN filename TEXT`); } catch {}
+try { db.exec(`ALTER TABLE campaigns ADD COLUMN header_link TEXT`); } catch {}
+try { db.exec(`ALTER TABLE campaigns ADD COLUMN header_type TEXT`); } catch {}
 
 const now = () => Date.now();
 
-export function upsertInbound({ waId, name, waMessageId, type, body, ts }) {
+export function upsertInbound({ waId, name, waMessageId, type, body, ts, mediaId = null, mimeType = null, filename = null }) {
   const t = ts ?? now();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, created_at)
-     VALUES (?, ?, 'inbound', ?, ?, 'received', ?)`
-  ).run(waMessageId ?? null, waId, type, body ?? null, t);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, media_id, mime_type, filename, created_at)
+     VALUES (?, ?, 'inbound', ?, ?, 'received', ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body ?? null, mediaId, mimeType, filename, t);
 
   db.prepare(
     `INSERT INTO conversations (wa_id, name, last_message, last_message_at, unread)
@@ -100,12 +105,12 @@ export function upsertInbound({ waId, name, waMessageId, type, body, ts }) {
   ).run(waId, name ?? null, body ?? `[${type}]`, t);
 }
 
-export function insertOutbound({ waId, waMessageId, body, bot = 0 }) {
+export function insertOutbound({ waId, waMessageId, body, bot = 0, type = 'text', mediaId = null, mimeType = null }) {
   const t = now();
   db.prepare(
-    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, created_at)
-     VALUES (?, ?, 'outbound', 'text', ?, 'sent', ?, ?)`
-  ).run(waMessageId ?? null, waId, body, bot, t);
+    `INSERT INTO messages (wa_message_id, wa_id, direction, type, body, status, bot, media_id, mime_type, created_at)
+     VALUES (?, ?, 'outbound', ?, ?, 'sent', ?, ?, ?, ?)`
+  ).run(waMessageId ?? null, waId, type, body, bot, mediaId, mimeType, t);
 
   db.prepare(
     `INSERT INTO conversations (wa_id, last_message, last_message_at, unread)
@@ -126,6 +131,10 @@ export function updateStatus(waMessageId, status) {
 
 export function listConversations() {
   return db.prepare(`SELECT * FROM conversations ORDER BY last_message_at DESC`).all();
+}
+
+export function getMessage(id) {
+  return db.prepare(`SELECT * FROM messages WHERE id = ?`).get(id);
 }
 
 export function listMessages(waId) {
@@ -181,12 +190,12 @@ export function setConversationBot(waId, enabled) {
 
 // ---------- الحملات ----------
 
-export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null }) {
+export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null, headerLink = null, headerType = null }) {
   const t = now();
   const status = scheduledAt ? 'scheduled' : 'draft';
   const r = db
-    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, t);
+    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, header_link, header_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, headerLink, headerType, t);
   const id = Number(r.lastInsertRowid);
   const ins = db.prepare(`INSERT INTO campaign_recipients (campaign_id, wa_id) VALUES (?, ?)`);
   for (const n of numbers) ins.run(id, n);
