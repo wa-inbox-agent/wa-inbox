@@ -50,6 +50,17 @@ import {
   deleteContact,
   isOptedOut,
   phonesForTag,
+  conversationExists,
+  setConversationStatus,
+  updateContact,
+  getContact,
+  listCanned,
+  addCanned,
+  deleteCanned,
+  listNotes,
+  addNote,
+  logWebhookEvent,
+  recentWebhookEvents,
 } from './db.js';
 import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -277,6 +288,8 @@ app.post('/webhook', (req, res) => {
             const contacts = value.contacts ?? [];
             for (const msg of value.messages) {
               const contact = contacts.find((c) => c.wa_id === msg.from);
+              const isNewConversation = !conversationExists(msg.from);
+              logWebhookEvent('message', `رسالة ${msg.type} من ${msg.from}`);
               const mediaObj = ['image', 'document', 'audio', 'video', 'sticker', 'voice'].includes(msg.type) ? msg[msg.type] : null;
               upsertInbound({
                 waId: msg.from,
@@ -294,11 +307,16 @@ app.post('/webhook', (req, res) => {
               if (msg.type === 'text' && /^(إيقاف|ايقاف|اوقف|stop|unsubscribe|إلغاء|الغاء)$/i.test(inboundText)) {
                 setContactOptOut(msg.from, true);
               }
+              // رسالة ترحيب تلقائية لأول محادثة (عند تفعيلها من إعدادات البوت)
+              if (isNewConversation && getSetting('welcome_enabled') === '1' && getBotSettings().enabled && getConversationBot(msg.from)) {
+                await sendBotText(msg.from, getSetting('welcome_message'));
+              }
               await maybeBotReply(msg);
             }
           }
           for (const st of value?.statuses ?? []) {
             updateStatus(st.id, st.status);
+            logWebhookEvent('status', `حالة ${st.status} للرسالة ${st.id}`);
           }
         }
       }
@@ -594,6 +612,91 @@ app.delete('/api/keys/:id', requireAdmin, (req, res) => {
 
 app.get('/api/reports/summary', (req, res) => {
   res.json(reportSummary());
+});
+
+// ---------- حالة المحادثة: مفتوحة / مغلقة ----------
+
+app.post('/api/conversations/:waId/status', (req, res) => {
+  const status = req.body?.status === 'closed' ? 'closed' : 'open';
+  setConversationStatus(req.params.waId, status);
+  res.json({ ok: true, status });
+});
+
+// ---------- بيانات جهة الاتصال وتعديلها ----------
+
+app.get('/api/contacts/:phone', (req, res) => {
+  const c = getContact(req.params.phone);
+  if (!c) return res.status(404).json({ error: 'جهة الاتصال غير موجودة' });
+  res.json(c);
+});
+
+app.post('/api/contacts/:phone', (req, res) => {
+  upsertContact({ phone: req.params.phone });
+  const { name, tags, notes } = req.body ?? {};
+  updateContact(req.params.phone, {
+    name: name !== undefined ? String(name) : undefined,
+    tags: Array.isArray(tags) ? tags.map((t) => String(t).trim()).filter(Boolean).join(' ') : undefined,
+    notes: notes !== undefined ? String(notes) : undefined,
+  });
+  res.json({ ok: true, contact: getContact(req.params.phone) });
+});
+
+// ---------- ملاحظات الفريق الداخلية (لا تُرسل للعميل) ----------
+
+app.get('/api/conversations/:waId/notes', (req, res) => {
+  res.json({ notes: listNotes(req.params.waId) });
+});
+
+app.post('/api/conversations/:waId/notes', (req, res) => {
+  const body = String(req.body?.body ?? '').trim();
+  if (!body) return res.status(400).json({ error: 'الملاحظة فارغة' });
+  const id = addNote(req.params.waId, req.agent?.name ?? null, body);
+  res.json({ ok: true, id });
+});
+
+// ---------- الردود الجاهزة ----------
+
+app.get('/api/canned', (req, res) => {
+  res.json({ canned: listCanned() });
+});
+
+app.post('/api/canned', (req, res) => {
+  const { title, body } = req.body ?? {};
+  if (!title?.trim() || !body?.trim()) return res.status(400).json({ error: 'العنوان والنص مطلوبان' });
+  const id = addCanned(title.trim(), body.trim());
+  res.json({ ok: true, id });
+});
+
+app.delete('/api/canned/:id', (req, res) => {
+  deleteCanned(Number(req.params.id));
+  res.json({ ok: true });
+});
+
+// ---------- رسالة الترحيب للمحادثات الجديدة ----------
+
+app.get('/api/bot/welcome', (req, res) => {
+  const s = allSettings();
+  res.json({ enabled: s.welcome_enabled === '1', message: s.welcome_message });
+});
+
+app.post('/api/bot/welcome', (req, res) => {
+  const { enabled, message } = req.body ?? {};
+  if (enabled !== undefined) setSetting('welcome_enabled', enabled ? '1' : '0');
+  if (message !== undefined) setSetting('welcome_message', String(message));
+  res.json({ ok: true });
+});
+
+// ---------- حالة الـ Webhook وآخر الأحداث الواردة ----------
+
+app.get('/api/webhook-events', (req, res) => {
+  const events = recentWebhookEvents();
+  const lastInbound = events.find((e) => e.kind === 'message') ?? null;
+  res.json({
+    configured: configured(),
+    callback_url: '/webhook',
+    last_inbound_at: lastInbound?.created_at ?? null,
+    events,
+  });
 });
 
 app.get('/api/health', (req, res) => {

@@ -19,7 +19,8 @@
   .view.active { display: flex; }
 
   /* المحادثات */
-  #convos { width: 320px; min-width: 260px; background: #111b21; border-inline-end: 1px solid #222d34; overflow-y: auto; }
+  #inboxSide { width: 320px; min-width: 260px; background: #111b21; border-inline-end: 1px solid #222d34; display: flex; flex-direction: column; min-height: 0; }
+  #convos { overflow-y: auto; flex: 1; }
   .convo { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #1f2c33; }
   .convo:hover, .convo.active { background: #2a3942; }
   .convo .name { font-weight: 600; display: flex; justify-content: space-between; }
@@ -28,6 +29,12 @@
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #chatHeader { background: #202c33; padding: 10px 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
   #chatHeader .bot-toggle { margin-inline-start: auto; font-size: 12px; font-weight: 400; display: flex; align-items: center; gap: 6px; color: #8696a0; }
+  .chip { background:#2a3942; color:#8696a0; border:1px solid #3b4a54; border-radius:20px; padding:4px 12px; font-size:12px; cursor:pointer; }
+  .chip.active { background:#00a884; color:#0b141a; border-color:#00a884; font-weight:600; }
+  #contactPanel { background:#111b21; border-bottom:1px solid #2a3942; padding:12px 16px; }
+  #contactPanel .cpgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; }
+  .note { background:#202c33; border-radius:8px; padding:6px 10px; margin:4px 0; font-size:13px; }
+  .note .meta { color:#8696a0; font-size:11px; }
   #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
   .msg { max-width: 65%; padding: 8px 12px; border-radius: 8px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .msg.inbound { background: #202c33; align-self: flex-start; }
@@ -103,13 +110,52 @@
 
 <!-- المحادثات -->
 <div class="view active" id="view-inbox">
-  <div id="convos"></div>
+  <div id="inboxSide">
+    <div style="padding:8px 10px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #1f2c33">
+      <input id="convoSearch" placeholder="🔍 بحث بالاسم أو الرقم..." style="background:#2a3942;border:none;border-radius:8px;padding:8px 10px;color:#e9edef;outline:none" />
+      <div id="convoFilters" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="chip active" data-filter="all">الكل</button>
+        <button class="chip" data-filter="unread">غير مقروءة</button>
+        <button class="chip" data-filter="mine">مسندة إليّ</button>
+        <button class="chip" data-filter="unassigned">غير مسندة</button>
+        <button class="chip" data-filter="closed">المغلقة</button>
+      </div>
+    </div>
+    <div id="convos"></div>
+  </div>
   <div id="chat">
     <div id="empty">اختر محادثة من القائمة</div>
     <div id="chatHeader" hidden>
       <span id="chatTitle"></span>
+      <button id="contactPanelBtn" class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0">👤 البيانات</button>
+      <button id="convoStatusBtn" class="btn secondary" style="padding:2px 10px;font-size:12px;margin:0"></button>
       <span id="assignArea" style="font-size:12px;color:#8696a0;display:flex;align-items:center;gap:6px"></span>
       <label class="bot-toggle">🤖 البوت <input type="checkbox" id="convBotToggle" /></label>
+    </div>
+    <div id="contactPanel" hidden>
+      <div class="cpgrid">
+        <div>
+          <label style="font-size:12px;color:#8696a0">الاسم</label>
+          <input id="cpName" />
+          <label style="font-size:12px;color:#8696a0">الوسوم (كلمات مفصولة بمسافات)</label>
+          <input id="cpTags" />
+          <label style="font-size:12px;color:#8696a0">ملاحظات عامة عن جهة الاتصال</label>
+          <textarea id="cpNotes" rows="2"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn" id="cpSave" style="padding:6px 16px;font-size:13px;margin:0">حفظ البيانات</button>
+            <button class="btn secondary" id="cpOptOut" style="padding:6px 16px;font-size:13px;margin:0"></button>
+            <span id="cpSaved" style="color:#00a884;font-size:12px" hidden>تم الحفظ ✓</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#8696a0">ملاحظات الفريق على المحادثة (داخلية، لا تصل للعميل)</label>
+          <div id="cpTeamNotes" style="max-height:140px;overflow-y:auto;margin-bottom:6px"></div>
+          <div style="display:flex;gap:6px">
+            <input id="cpNoteInput" placeholder="أضف ملاحظة داخلية..." style="flex:1" />
+            <button class="btn" id="cpNoteAdd" style="padding:6px 14px;font-size:13px;margin:0">إضافة</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="messages" hidden></div>
     <form id="composer" hidden>
@@ -121,6 +167,7 @@
         <option value="audio">صوت</option>
       </select>
       <input id="replyMediaUrl" placeholder="رابط ميديا https:// (اختياري)" dir="ltr" style="max-width:220px" />
+      <select id="cannedPick" style="width:120px;flex:none" title="رد جاهز"><option value="">⚡ رد جاهز</option></select>
       <input id="replyInput" placeholder="اكتب رسالة... (الرد اليدوي يوقف البوت عن هذه المحادثة)" autocomplete="off" />
       <button type="submit">إرسال</button>
     </form>
@@ -221,6 +268,11 @@
     <h2>التقارير</h2>
     <div id="repCards" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px"></div>
     <div class="card">
+      <h3>حالة الاتصال بميتا (Webhook) <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadWebhookCard()">تحديث</button></h3>
+      <div id="whStatus" style="font-size:14px;margin-bottom:8px"></div>
+      <table id="whEvents"><thead><tr><th>الوقت</th><th>النوع</th><th>التفاصيل</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
       <h3>الرسائل آخر 14 يوم <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadReports()">تحديث</button></h3>
       <table id="repTable"><thead><tr><th>اليوم</th><th>واردة</th><th>صادرة</th></tr></thead><tbody></tbody></table>
     </div>
@@ -285,6 +337,15 @@
       <span>البوت مفعّل على كل المحادثات</span>
     </div>
     <div class="card">
+      <h3>رسالة الترحيب لأول محادثة</h3>
+      <div class="switch-row" style="margin-bottom:10px">
+        <input type="checkbox" id="wcEnabled" />
+        <span>إرسال رسالة ترحيب تلقائية عند أول رسالة من عميل جديد</span>
+      </div>
+      <textarea id="wcMessage"></textarea>
+      <button class="btn" id="wcSave">حفظ</button>
+    </div>
+    <div class="card">
       <h3>إضافة قاعدة</h3>
       <label>النوع</label>
       <select id="ruleType">
@@ -305,6 +366,15 @@
     <div class="card">
       <h3>القواعد الحالية</h3>
       <table id="rulesTable"><thead><tr><th>النوع</th><th>الكلمة المفتاحية</th><th>الرد</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
+      <h3>الردود الجاهزة (تظهر كاختصار ⚡ في صندوق الرد بالوارد)</h3>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1;min-width:130px"><label>العنوان</label><input id="cnTitle" placeholder="مثال: ترحيب" /></div>
+        <div style="flex:2;min-width:220px"><label>النص</label><input id="cnBody" /></div>
+        <button class="btn" id="cnAdd" style="margin:0">إضافة</button>
+      </div>
+      <table id="cnTable"><thead><tr><th>العنوان</th><th>النص</th><th></th></tr></thead><tbody></tbody></table>
     </div>
     <div class="card">
       <h3>الرد خارج أوقات العمل</h3>
@@ -330,6 +400,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 let me = null;
 const showLogin = (show) => { $('loginOverlay').hidden = !show; };
 const api = async (url, opts) => {
@@ -436,7 +507,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   if (b.dataset.view === 'agents') loadAgents();
   if (b.dataset.view === 'reports') loadReports();
   if (b.dataset.view === 'api') loadKeys();
-  if (b.dataset.view === 'bot') loadBot();
+  if (b.dataset.view === 'bot') { loadBot(); loadCanned(); loadWelcome(); }
 }));
 
 async function loadHealth() {
@@ -456,19 +527,45 @@ const statusMark = (m) => {
   return ` <span class="${cls}">${marks[m.status] || ''}</span>`;
 };
 
+let lastConversations = [];
+let convoFilter = 'all';
 async function loadConvos() {
   const { conversations } = await api('/api/conversations');
+  lastConversations = conversations;
+  renderConvos();
+  const totalUnread = conversations.filter((c) => c.status !== 'closed').reduce((sum, c) => sum + (c.unread || 0), 0);
+  document.title = totalUnread ? `(${totalUnread}) صندوق الوارد` : 'صندوق الوارد';
+}
+function renderConvos() {
+  const q = ($('convoSearch').value || '').trim();
+  const list = lastConversations.filter((c) => {
+    if (convoFilter === 'all' && c.status === 'closed') return false;
+    if (convoFilter === 'unread' && !(c.unread && c.status !== 'closed')) return false;
+    if (convoFilter === 'mine' && c.assigned_to !== me?.id) return false;
+    if (convoFilter === 'unassigned' && (c.assigned_to || c.status === 'closed')) return false;
+    if (convoFilter === 'closed' && c.status !== 'closed') return false;
+    if (q && !(c.name || '').includes(q) && !c.wa_id.includes(q) && !(c.last_message || '').includes(q)) return false;
+    return true;
+  });
   $('convos').innerHTML = '';
-  for (const c of conversations) {
+  for (const c of list) {
     const div = document.createElement('div');
     div.className = 'convo' + (c.wa_id === currentWaId ? ' active' : '');
     div.innerHTML = `
-      <div class="name"><span>${c.name || c.wa_id}</span>${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
-      <div class="preview">${c.last_message || ''}</div>`;
+      <div class="name"><span>${c.status === 'closed' ? '🔒 ' : ''}${esc(c.name || c.wa_id)}</span>${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
+      <div class="preview">${esc(c.last_message || '')}</div>`;
     div.onclick = () => openConvo(c);
     $('convos').appendChild(div);
   }
+  if (!list.length) $('convos').innerHTML = '<div style="padding:16px;color:#8696a0;font-size:13px">لا محادثات مطابقة</div>';
 }
+document.querySelectorAll('#convoFilters .chip').forEach((b) => (b.onclick = () => {
+  document.querySelectorAll('#convoFilters .chip').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active');
+  convoFilter = b.dataset.filter;
+  renderConvos();
+}));
+$('convoSearch').oninput = () => renderConvos();
 
 async function openConvo(c) {
   currentWaId = c.wa_id;
@@ -476,10 +573,88 @@ async function openConvo(c) {
   $('chatHeader').hidden = $('messages').hidden = $('composer').hidden = false;
   $('chatTitle').textContent = (c.name || c.wa_id) + ' — ' + c.wa_id;
   $('convBotToggle').checked = Boolean(c.bot_enabled);
+  $('convoStatusBtn').textContent = c.status === 'closed' ? '↩️ إعادة فتح المحادثة' : '✔️ إغلاق المحادثة';
   renderAssignArea(c.assigned_name ?? null, c.assigned_to ?? null);
+  loadContactPanel(c.wa_id);
   await loadMessages();
   loadConvos();
 }
+
+$('convoStatusBtn').onclick = async () => {
+  if (!currentWaId) return;
+  const c = lastConversations.find((x) => x.wa_id === currentWaId);
+  const next = c?.status === 'closed' ? 'open' : 'closed';
+  await api(`/api/conversations/${currentWaId}/status`, { body: { status: next } });
+  $('convoStatusBtn').textContent = next === 'closed' ? '↩️ إعادة فتح المحادثة' : '✔️ إغلاق المحادثة';
+  loadConvos();
+};
+
+$('contactPanelBtn').onclick = () => { $('contactPanel').hidden = !$('contactPanel').hidden; };
+
+async function loadContactPanel(waId) {
+  $('cpSaved').hidden = true;
+  try {
+    const c = await api(`/api/contacts/${waId}`);
+    $('cpName').value = c.name || '';
+    $('cpTags').value = c.tags || '';
+    $('cpNotes').value = c.notes || '';
+    $('cpOptOut').dataset.state = c.opted_out ? '1' : '0';
+    $('cpOptOut').textContent = c.opted_out ? 'إعادة تفعيل استقبال الحملات' : 'إيقاف الحملات عنه (opt-out)';
+  } catch {
+    $('cpName').value = $('cpTags').value = $('cpNotes').value = '';
+  }
+  loadTeamNotes();
+}
+
+$('cpSave').onclick = async () => {
+  if (!currentWaId) return;
+  await api(`/api/contacts/${currentWaId}`, { body: {
+    name: $('cpName').value,
+    tags: $('cpTags').value.split(/\s+/).filter(Boolean),
+    notes: $('cpNotes').value,
+  } });
+  $('cpSaved').hidden = false;
+  loadConvos();
+};
+
+$('cpOptOut').onclick = async () => {
+  if (!currentWaId) return;
+  const next = $('cpOptOut').dataset.state !== '1';
+  await api(`/api/contacts/${currentWaId}/optout`, { body: { opted_out: next } });
+  loadContactPanel(currentWaId);
+};
+
+async function loadTeamNotes() {
+  if (!currentWaId) return;
+  try {
+    const { notes } = await api(`/api/conversations/${currentWaId}/notes`);
+    $('cpTeamNotes').innerHTML = notes.map((n) => `<div class="note"><div>${esc(n.body)}</div><div class="meta">${esc(n.agent_name || '')} · ${fmtTime(n.created_at)}</div></div>`).join('')
+      || '<div style="color:#8696a0;font-size:12px">لا ملاحظات بعد</div>';
+  } catch {}
+}
+
+$('cpNoteAdd').onclick = async () => {
+  const body = $('cpNoteInput').value.trim();
+  if (!body || !currentWaId) return;
+  $('cpNoteInput').value = '';
+  await api(`/api/conversations/${currentWaId}/notes`, { body: { body } });
+  loadTeamNotes();
+};
+
+async function loadCannedPicker() {
+  try {
+    const { canned } = await api('/api/canned');
+    $('cannedPick').innerHTML = '<option value="">⚡ رد جاهز</option>' + canned.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join('');
+  } catch {}
+}
+$('cannedPick').onchange = async () => {
+  const id = $('cannedPick').value;
+  $('cannedPick').value = '';
+  if (!id) return;
+  const { canned } = await api('/api/canned');
+  const c = canned.find((x) => String(x.id) === String(id));
+  if (c) { $('replyInput').value = c.body; $('replyInput').focus(); }
+};
 
 $('convBotToggle').onchange = async (e) => {
   if (!currentWaId) return;
@@ -726,7 +901,21 @@ async function loadReports() {
   tp.innerHTML = '';
   for (const c of r.topConversations) tp.innerHTML += `<tr><td dir="ltr">${c.wa_id}</td><td>${c.messages}</td></tr>`;
   if (!r.topConversations.length) tp.innerHTML = '<tr><td colspan="2" style="color:#8696a0">—</td></tr>';
+  loadWebhookCard();
 }
+
+async function loadWebhookCard() {
+  try {
+    const w = await api('/api/webhook-events');
+    $('whStatus').innerHTML = w.last_inbound_at
+      ? `<span style="color:#00a884">✓ الـ Webhook يستلم — آخر رسالة واردة: ${fmtTime(w.last_inbound_at)}</span>`
+      : `<span style="color:#e0a800">⚠ لم تصل أي رسالة عبر الـ Webhook بعد. تأكد من ربط Callback URL في لوحة ميتا.</span>`;
+    const tb = document.querySelector('#whEvents tbody');
+    tb.innerHTML = w.events.map((e) => `<tr><td dir="ltr" style="white-space:nowrap">${fmtTime(e.created_at)}</td><td>${e.kind === 'message' ? 'رسالة' : 'حالة'}</td><td dir="ltr" style="font-size:12px">${esc(e.summary || '')}</td></tr>`).join('')
+      || '<tr><td colspan="3" style="color:#8696a0">لا أحداث بعد</td></tr>';
+  } catch {}
+}
+window.loadWebhookCard = loadWebhookCard;
 window.loadReports = loadReports;
 
 // ===== مفاتيح API =====
@@ -762,6 +951,34 @@ async function delKey(id) { await api(`/api/keys/${id}`, { method: 'DELETE' }); 
 window.delKey = delKey;
 
 async function delRule(id) { await api(`/api/bot/rules/${id}`, { method: 'DELETE' }); loadBot(); }
+
+async function loadCanned() {
+  const { canned } = await api('/api/canned');
+  const tb = document.querySelector('#cnTable tbody');
+  tb.innerHTML = canned.map((c) => `<tr><td>${esc(c.title)}</td><td>${esc(c.body)}</td><td><button class="btn secondary" style="padding:2px 10px;font-size:12px" onclick="delCanned(${c.id})">حذف</button></td></tr>`).join('')
+    || '<tr><td colspan="3" style="color:#8696a0">لا ردود جاهزة بعد</td></tr>';
+}
+$('cnAdd').onclick = async () => {
+  const title = $('cnTitle').value.trim();
+  const body = $('cnBody').value.trim();
+  if (!title || !body) return alert('العنوان والنص مطلوبان');
+  await api('/api/canned', { body: { title, body } });
+  $('cnTitle').value = $('cnBody').value = '';
+  loadCanned();
+  loadCannedPicker();
+};
+async function delCanned(id) { await api(`/api/canned/${id}`, { method: 'DELETE' }); loadCanned(); loadCannedPicker(); }
+window.delCanned = delCanned;
+
+async function loadWelcome() {
+  const w = await api('/api/bot/welcome');
+  $('wcEnabled').checked = w.enabled;
+  $('wcMessage').value = w.message || '';
+}
+$('wcSave').onclick = async () => {
+  await api('/api/bot/welcome', { body: { enabled: $('wcEnabled').checked, message: $('wcMessage').value } });
+  alert('تم حفظ رسالة الترحيب');
+};
 window.delRule = delRule;
 
 (async () => {
@@ -774,6 +991,7 @@ window.delRule = delRule;
   }
   loadHealth();
   loadConvos().catch(() => {});
+  loadCannedPicker();
   setInterval(() => { if (me) { loadConvos().catch(() => {}); loadMessages().catch(() => {}); } }, 5000);
 })();
 </script>

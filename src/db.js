@@ -53,6 +53,29 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS canned_responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS convo_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wa_id TEXT NOT NULL,
+  agent_name TEXT,
+  body TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_wa ON convo_notes(wa_id, created_at);
+
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  summary TEXT,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS api_keys (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   label TEXT NOT NULL,
@@ -113,6 +136,9 @@ try { db.exec(`ALTER TABLE bot_rules ADD COLUMN type TEXT NOT NULL DEFAULT 'keyw
 try { db.exec(`ALTER TABLE bot_rules ADD COLUMN options TEXT`); } catch {}
 try { db.exec(`ALTER TABLE conversations ADD COLUMN pending_menu INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE conversations ADD COLUMN last_after_hours_at INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT 'open'`); } catch {}
+try { db.exec(`ALTER TABLE contacts ADD COLUMN notes TEXT`); } catch {}
+try { db.exec(`ALTER TABLE campaigns ADD COLUMN body_params TEXT`); } catch {}
 
 const now = () => Date.now();
 
@@ -267,6 +293,8 @@ export function setPendingMenu(waId, ruleId) {
 // ---------- الإعدادات العامة (ساعات العمل، الرد خارج الدوام) ----------
 
 const DEFAULTS = {
+  welcome_enabled: '0',
+  welcome_message: 'أهلًا بك في أكاديمية غرفة جازان! كيف نقدر نساعدك اليوم؟',
   after_hours_enabled: '0',
   after_hours_message: 'شكرًا لتواصلك معنا. نحن خارج أوقات العمل حاليًا، وسنرد عليك في أقرب وقت خلال الدوام.',
   work_start: '09:00',
@@ -479,4 +507,63 @@ export function reportSummary() {
     `SELECT wa_id, count(*) AS messages FROM messages GROUP BY wa_id ORDER BY messages DESC LIMIT 5`
   ).all();
   return { perDay, totals, campaigns, recipients, contacts, topConversations };
+}
+
+export function conversationExists(waId) {
+  return !!db.prepare(`SELECT 1 FROM conversations WHERE wa_id = ?`).get(waId);
+}
+
+// ---------- حالة المحادثة (مفتوحة/مغلقة) ----------
+
+export function setConversationStatus(waId, status) {
+  db.prepare(`UPDATE conversations SET status = ? WHERE wa_id = ?`).run(status, waId);
+}
+
+// ---------- تعديل جهة اتصال ----------
+
+export function updateContact(phone, { name, tags, notes }) {
+  if (name !== undefined) db.prepare(`UPDATE contacts SET name = ? WHERE phone = ?`).run(name, phone);
+  if (tags !== undefined) db.prepare(`UPDATE contacts SET tags = ? WHERE phone = ?`).run(tags, phone);
+  if (notes !== undefined) db.prepare(`UPDATE contacts SET notes = ? WHERE phone = ?`).run(notes, phone);
+}
+
+export function getContact(phone) {
+  return db.prepare(`SELECT * FROM contacts WHERE phone = ?`).get(phone);
+}
+
+// ---------- الردود الجاهزة ----------
+
+export function listCanned() {
+  return db.prepare(`SELECT * FROM canned_responses ORDER BY id ASC`).all();
+}
+
+export function addCanned(title, body) {
+  const r = db.prepare(`INSERT INTO canned_responses (title, body, created_at) VALUES (?, ?, ?)`).run(title, body, now());
+  return Number(r.lastInsertRowid);
+}
+
+export function deleteCanned(id) {
+  db.prepare(`DELETE FROM canned_responses WHERE id = ?`).run(id);
+}
+
+// ---------- ملاحظات الفريق الداخلية على المحادثات ----------
+
+export function listNotes(waId) {
+  return db.prepare(`SELECT * FROM convo_notes WHERE wa_id = ? ORDER BY created_at ASC`).all(waId);
+}
+
+export function addNote(waId, agentName, body) {
+  const r = db.prepare(`INSERT INTO convo_notes (wa_id, agent_name, body, created_at) VALUES (?, ?, ?, ?)`).run(waId, agentName, body, now());
+  return Number(r.lastInsertRowid);
+}
+
+// ---------- سجل أحداث الـ Webhook ----------
+
+export function logWebhookEvent(kind, summary) {
+  db.prepare(`INSERT INTO webhook_events (kind, summary, created_at) VALUES (?, ?, ?)`).run(kind, summary, now());
+  db.prepare(`DELETE FROM webhook_events WHERE id NOT IN (SELECT id FROM webhook_events ORDER BY id DESC LIMIT 50)`).run();
+}
+
+export function recentWebhookEvents() {
+  return db.prepare(`SELECT * FROM webhook_events ORDER BY id DESC LIMIT 10`).all();
 }
