@@ -68,6 +68,21 @@
   #licenseForm .btn { width: 100%; margin-top: 14px; }
   #licenseForm .install-code { direction: ltr; text-align: center; font-family: monospace; font-size: 24px; letter-spacing: 4px; background: #f4f2ec; border: 1px dashed var(--gold); border-radius: 10px; padding: 10px; margin: 8px 0; color: var(--navy); font-weight: 700; }
   #licenseForm textarea { width: 100%; min-height: 90px; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px; direction: ltr; resize: vertical; }
+  .guide-step { background: #fff; border-radius: 14px; padding: 18px 20px; margin-bottom: 12px; border: 1.5px solid #ece9e2; }
+  .guide-step.done { border-color: #2e7d32; background: #f4faf4; }
+  .guide-step .gs-head { display: flex; align-items: center; gap: 10px; }
+  .guide-step .gs-num { width: 30px; height: 30px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+  .guide-step.done .gs-num { background: #2e7d32; }
+  .guide-step h3 { color: var(--navy); font-size: 15px; font-weight: 800; flex: 1; margin: 0; }
+  .guide-step .gs-body { margin-top: 10px; color: #333; font-size: 13.5px; line-height: 1.9; }
+  .guide-step .gs-body ol { margin: 6px 0; padding-inline-start: 20px; }
+  .guide-step .gs-body .ext { color: var(--gold); font-weight: 700; }
+  .guide-step .gs-check { flex-shrink: 0; }
+  .guide-step .gs-check input { width: 20px; height: 20px; accent-color: #2e7d32; cursor: pointer; }
+  .guide-step .gs-auto { font-size: 11px; color: #2e7d32; font-weight: 700; }
+  .guide-cost { background: #fff8e6; border: 1.5px solid var(--gold); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; font-size: 13.5px; line-height: 1.9; }
+  #guideBanner { background: #fff8e6; border: 1.5px solid var(--gold); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13.5px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  #guideBanner .btn { padding: 6px 16px; font-size: 13px; width: auto; }
   .brand-initial { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 20px; }
   .brand-initial.big { width: 72px; height: 72px; margin: 0 auto 14px; background: var(--navy); border-radius: 18px; font-size: 34px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; }
   #loginPass { width: 100%; background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 11px 13px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
@@ -283,6 +298,7 @@
     <div class="brand-sub" id="headBrandSub">منصة واتساب للأعمال</div>
   </div>
   <nav>
+    <button data-view="guide" id="guideNav"><span class="ico">🚀</span>دليل التشغيل</button>
     <button data-view="dashboard" class="active"><span class="ico">📊</span>لوحة التحكم</button>
     <div class="nav-group">إدارة واتساب</div>
     <button data-view="profile"><span class="ico">🏢</span>الملف التجاري</button>
@@ -311,7 +327,103 @@
 </header>
 
 <!-- لوحة التحكم -->
+<!-- دليل التشغيل خطوة بخطوة -->
+<div class="view" id="view-guide">
+  <div class="page">
+    <h2>🚀 دليل التشغيل خطوة بخطوة</h2>
+    <div class="guide-cost">
+      <b>مين بيدفع إيه؟</b><br />
+      ✅ اشتراك المنصة السنوي: اتفقت عليه مع البائع، وهو اللي بيفعّل نسختك.<br />
+      🧾 عليك أنت (على حسابك مباشرة): الاستضافة (في خطة مجانية أو مدفوعة حسب اختيارك)، الدومين لو حبيت رابط خاص (حوالي 10-15 دولار في السنة)، وتكلفة رسايل واتساب بتتخصم من حسابك في ميتا حسب أسعارهم الرسمية.
+    </div>
+
+    <div class="guide-step" data-step="s1">
+      <div class="gs-head"><div class="gs-num">1</div><h3>أنشئ حساب Meta Business ووثّق نشاطك</h3><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>ادخل على <span class="ext" dir="ltr">business.facebook.com</span> وسجّل بحساب فيسبوك الشخصي بتاعك.</li>
+          <li>أنشئ حساب أعمال (Business Account) باسم نشاطك التجاري.</li>
+          <li>من <b>إعدادات الأعمال ← مركز الأمان</b> ابدأ <b>توثيق النشاط التجاري</b>: ارفع مستند رسمي (سجل تجاري أو ما يعادله) ورقم تليفون أو موقع مرتبط بالنشاط.</li>
+        </ol>
+        ملحوظة: التوثيق ممكن ياخد من يوم لعدة أيام، وتقدر تكمل باقي الخطوات وتجرب وهو تحت المراجعة، لكن لازم يخلص عشان الاسم المعتمد والحدود الكاملة للإرسال.
+      </div>
+    </div>
+
+    <div class="guide-step" data-step="s2">
+      <div class="gs-head"><div class="gs-num">2</div><h3>جهّز رقم واتساب مخصص للمنصة</h3><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>اختار رقم تليفون يكون مخصص لنشاطك على المنصة (شريحة جديدة أو رقم موجود).</li>
+          <li>الرقم لازم يقدر يستقبل SMS أو مكالمة للتحقق.</li>
+          <li><b>مهم:</b> الرقم اللي بيتركب على الـ API مش بيشتغل بعدها على تطبيق واتساب العادي أو واتساب بيزنس. لو رقمك عليه واتساب حالي، هتحتاج تمسح الحساب من التطبيق الأول.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="guide-step" data-step="s3">
+      <div class="gs-head"><div class="gs-num">3</div><h3>أنشئ تطبيق على منصة مطوري ميتا</h3><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>ادخل على <span class="ext" dir="ltr">developers.facebook.com</span> وسجّل كمطوّر بنفس حساب الفيسبوك.</li>
+          <li>من <b>My Apps ← Create App</b> اختار النوع <b>Business</b> واربطه بحساب الأعمال اللي عملته في الخطوة 1.</li>
+          <li>من صفحة التطبيق، أضف منتج <b>WhatsApp</b> (اضغط Set up جنبه).</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="guide-step" data-step="s4">
+      <div class="gs-head"><div class="gs-num">4</div><h3>اربط الرقم واطلع بيانات الربط والتوكن الدائم</h3><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>في تطبيقك افتح <b>WhatsApp ← API Setup</b> وأضف رقم التليفون (من Add phone number) وكمّل التحقق بالكود.</li>
+          <li>من نفس الصفحة خُد: <b>Phone Number ID</b> و <b>WhatsApp Business Account ID</b>.</li>
+          <li>التوكن المؤقت اللي بيظهر في الصفحة دي بيعيش 24 ساعة بس. للتوكن الدائم: افتح <span class="ext" dir="ltr">business.facebook.com</span> ← <b>إعدادات الأعمال ← المستخدمون ← مستخدمو النظام (System Users)</b> ← أضف مستخدم نظام (Admin) ← <b>Generate New Token</b> ← اختار تطبيقك وفعّل صلاحيتي <span dir="ltr">whatsapp_business_messaging</span> و <span dir="ltr">whatsapp_business_management</span> ← انسخ التوكن واحفظه عندك.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="guide-step" data-step="s5">
+      <div class="gs-head"><div class="gs-num">5</div><h3>أدخل البيانات في المنصة</h3><span class="gs-auto" id="gsAuto5" hidden>✓ تم تلقائيًا</span><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>افتح صفحة <b>المطورون (API)</b> من القائمة الجانبية.</li>
+          <li>في كارت <b>ربط واتساب للأعمال (ميتا)</b> الصق: Phone Number ID و WABA ID والتوكن الدائم، واكتب <b>Verify Token</b> من عندك (أي كلمة سر تفتكرها) واضغط حفظ.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="guide-step" data-step="s6">
+      <div class="gs-head"><div class="gs-num">6</div><h3>اربط الـ Webhook في لوحة ميتا</h3><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>ارجع لتطبيقك على <span class="ext" dir="ltr">developers.facebook.com</span> ← <b>WhatsApp ← Configuration</b>.</li>
+          <li>في خانة Webhook اضغط Edit والصق:<br />Callback URL: <b dir="ltr" id="guideHookUrl"></b><br />Verify Token: نفس الكلمة اللي حفظتها في الخطوة 5.</li>
+          <li>اضغط Verify and Save، وبعدين في قسم Webhook fields فعّل الاشتراك في حقل <b>messages</b>.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="guide-step" data-step="s7">
+      <div class="gs-head"><div class="gs-num">7</div><h3>جرّب الإرسال والاستقبال وابدأ الشغل</h3><label class="gs-check"><input type="checkbox" /></label></div>
+      <div class="gs-body">
+        <ol>
+          <li>ابعت رسالة من واتساب تليفونك لرقم المنصة — المفروض تظهر فورًا في <b>المحادثات المباشرة</b> هنا.</li>
+          <li>جرّب ترد عليها من المنصة.</li>
+          <li>لو وصلت ورديت، مبروك 🎉 المنصة شغالة بالكامل لحسابك.</li>
+        </ol>
+        بعدها بخطوات اختيارية من داخل المنصة: أنشئ <b>قوالب الرسائل</b> وابعتها للاعتماد، استورد <b>جهات الاتصال</b>، فعّل <b>البوت</b>، أضف <b>الموظفين</b>، ولو حابب ركّب <b>دومين خاص</b> من إعدادات الاستضافة.
+      </div>
+    </div>
+
+    <div class="hint" style="margin-top:10px">محتاج مساعدة في أي خطوة؟ كلّم البائع على نفس الرقم اللي اشتريت منه.</div>
+  </div>
+</div>
+
 <div class="view active" id="view-dashboard">
+  <div id="guideBanner" hidden>
+    <span>🚀 نسختك لسه مش شغالة بالكامل — كمّل خطوات الربط من دليل التشغيل.</span>
+    <button class="btn" id="guideBannerBtn">فتح الدليل</button>
+  </div>
   <div class="page">
     <h2>لوحة التحكم</h2>
     <div class="dash-cards" id="dashCards"></div>
@@ -979,6 +1091,40 @@ $('setupForm').onsubmit = async (e) => {
   }
 };
 
+let guideProgress = {};
+async function loadGuide() {
+  try {
+    const g = await api('/api/guide');
+    guideProgress = g.progress || {};
+    document.querySelectorAll('.guide-step').forEach((el) => {
+      const st = el.dataset.step;
+      const cb = el.querySelector('input[type=checkbox]');
+      const auto = st === 's5' && g.meta_ready;
+      cb.checked = auto || Boolean(guideProgress[st]);
+      cb.disabled = auto;
+      el.classList.toggle('done', cb.checked);
+    });
+    $('gsAuto5').hidden = !g.meta_ready;
+    $('guideHookUrl').textContent = location.origin + '/webhook';
+    const doneCount = document.querySelectorAll('.guide-step.done').length;
+    $('guideBanner').hidden = g.meta_ready || doneCount >= 7;
+  } catch {}
+}
+document.querySelectorAll('.guide-step input[type=checkbox]').forEach((cb) => {
+  cb.onchange = async () => {
+    const el = cb.closest('.guide-step');
+    const st = el.dataset.step;
+    el.classList.toggle('done', cb.checked);
+    guideProgress[st] = cb.checked;
+    try {
+      await api('/api/guide', { body: { step: st, done: cb.checked } });
+    } catch {}
+  };
+});
+$('guideBannerBtn').onclick = () => {
+  document.querySelector('nav button[data-view=guide]').click();
+};
+
 async function loadMetaSettings() {
   try {
     const m = await api('/api/settings/meta');
@@ -1019,7 +1165,7 @@ $('loginForm').onsubmit = async (e) => {
     $('loginPass').value = '';
     showLogin(false);
     await initMe(r.agent);
-    loadHealth(); loadConvos(); loadPhoneNumbers(); loadDashboard();
+    loadHealth(); loadConvos(); loadPhoneNumbers(); loadDashboard(); loadGuide().catch(() => {});
   } catch (err) {
     $('loginErr').textContent = err.message;
     $('loginErr').style.display = 'block';
@@ -1127,7 +1273,8 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
   b.classList.add('active');
   $('view-' + b.dataset.view).classList.add('active');
-  if (b.dataset.view === 'dashboard') loadDashboard();
+  if (b.dataset.view === 'guide') loadGuide();
+  if (b.dataset.view === 'dashboard') { loadDashboard(); loadGuide(); }
   if (b.dataset.view === 'profile') loadProfile();
   if (b.dataset.view === 'quick') loadQuick();
   if (b.dataset.view === 'blocked') loadBlocked();
@@ -2299,6 +2446,7 @@ window.delRule = delRule;
     }
   }
   loadHealth();
+  loadGuide().catch(() => {});
   loadConvos().catch(() => {});
   loadPhoneNumbers().catch(() => {});
   loadDashboard().catch(() => {});

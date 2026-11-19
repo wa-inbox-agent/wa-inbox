@@ -273,6 +273,33 @@ app.post('/api/setup', (req, res) => {
   res.json({ ok: true });
 });
 
+// تقدم دليل التشغيل خطوة بخطوة
+app.get('/api/guide', (req, res) => {
+  let progress = {};
+  try {
+    progress = JSON.parse(getSetting('guide_progress') || '{}');
+  } catch {}
+  const metaReady = Boolean(
+    (getSetting('wa_phone_number_id') || process.env.PHONE_NUMBER_ID) &&
+    (getSetting('wa_waba_id') || process.env.WABA_ID) &&
+    (getSetting('wa_token') || process.env.WHATSAPP_TOKEN)
+  );
+  res.json({ progress, meta_ready: metaReady });
+});
+
+app.post('/api/guide', requireAdmin, (req, res) => {
+  const { step, done } = req.body ?? {};
+  if (!step || !/^s[1-9]$/.test(String(step))) return res.status(400).json({ error: 'خطوة غير صحيحة' });
+  let progress = {};
+  try {
+    progress = JSON.parse(getSetting('guide_progress') || '{}');
+  } catch {}
+  if (done) progress[String(step)] = true;
+  else delete progress[String(step)];
+  setSetting('guide_progress', JSON.stringify(progress));
+  res.json({ ok: true });
+});
+
 // تحديث بيانات ميتا والعلامة التجارية من داخل المنصة (مدير فقط)
 app.get('/api/settings/meta', requireAdmin, (req, res) => {
   const mask = (v) => (v ? '••••' + String(v).slice(-4) : '');
