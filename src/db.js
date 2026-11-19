@@ -355,6 +355,8 @@ export function transferConversation(waId, fromPn, toPn) {
     const row = db.prepare(`SELECT * FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, from);
     if (row) {
       db.prepare(`DELETE FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).run(waId, from);
+      // لو فيه محادثة قديمة لنفس العميل تحت القسم المستهدف، امسحها عشان تتبدل
+      db.prepare(`DELETE FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).run(waId, toPn);
       db.prepare(
         `INSERT INTO conversations (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status, labels)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
