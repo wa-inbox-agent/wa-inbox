@@ -405,7 +405,7 @@ export function getAgentByUsername(username) {
 }
 
 export function getAgent(id) {
-  return db.prepare(`SELECT id, username, name, role, active FROM agents WHERE id = ?`).get(id);
+  return db.prepare(`SELECT id, username, name, role, active, phone_number_id FROM agents WHERE id = ?`).get(id);
 }
 
 export function setAgentActive(id, active) {
