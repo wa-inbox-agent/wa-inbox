@@ -82,7 +82,7 @@ import {
 } from './db.js';
 import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile, getNumberQuality } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual, verify as cryptoVerify } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -117,6 +117,29 @@ const wrap = (fn) => async (req, res) => {
 // ---------- المصادقة وتعدد الموظفين ----------
 
 const AUTH_SECRET = process.env.AUTH_SECRET || randomBytes(32).toString('hex');
+
+// ---------- ترخيص النسخة المدفوعة ----------
+
+const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA8ayBIfe6EiNUCoHit+6NCXJvfAcP/+XAMbXprjFjEmk=
+-----END PUBLIC KEY-----`;
+
+if (!getSetting('instance_id')) setSetting('instance_id', randomBytes(4).toString('hex'));
+const instanceId = () => getSetting('instance_id');
+const licenseActivated = () => Boolean(getSetting('license_key'));
+
+function verifyLicenseKey(keyStr) {
+  try {
+    const [b64name, b64sig] = String(keyStr).trim().split('.');
+    const name = Buffer.from(b64name, 'base64url').toString('utf8');
+    if (!name || name.length > 80 || !b64sig) return null;
+    const msg = `wa-inbox-license|${instanceId()}|${name}`;
+    const ok = cryptoVerify(null, Buffer.from(msg), LICENSE_PUBLIC_KEY, Buffer.from(b64sig, 'base64url'));
+    return ok ? name : null;
+  } catch {
+    return null;
+  }
+}
 const COOKIE = 'wa_session';
 
 function hashPassword(password) {
@@ -155,8 +178,11 @@ function readSession(req) {
 }
 
 // ملاحظة: داخل app.use('/api') يكون req.path بدون البادئة /api
-const PUBLIC_API = new Set(['/health', '/auth/login', '/setup', '/setup/status', '/public/brand']);
+const OPEN_ALWAYS = new Set(['/health', '/license/status', '/license/activate']);
+const PUBLIC_API = new Set(['/auth/login', '/setup', '/setup/status', '/public/brand']);
 app.use('/api', (req, res, next) => {
+  if (OPEN_ALWAYS.has(req.path)) return next();
+  if (!licenseActivated()) return res.status(403).json({ error: 'المنصة غير مفعّلة بعد. أدخل كود التفعيل أولًا.', license_required: true });
   if (PUBLIC_API.has(req.path) || req.path.startsWith('/outbound')) return next();
   const agent = readSession(req);
   if (!agent) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
@@ -200,12 +226,30 @@ app.post('/api/auth/login', (req, res) => {
 
 // ---------- الإعداد الأولي للنسخة الجديدة (الإعداد الذاتي للمشتري) ----------
 
+app.get('/api/license/status', (req, res) => {
+  res.json({
+    activated: licenseActivated(),
+    instance_id: instanceId(),
+    licensee: getSetting('licensee_name') || '',
+  });
+});
+
+app.post('/api/license/activate', (req, res) => {
+  if (licenseActivated()) return res.status(409).json({ error: 'المنصة مفعّلة بالفعل' });
+  const name = verifyLicenseKey(req.body?.key ?? '');
+  if (!name) return res.status(400).json({ error: 'كود التفعيل غير صحيح. تأكد من نسخه كاملًا أو راجع البائع.' });
+  setSetting('license_key', String(req.body.key).trim());
+  setSetting('licensee_name', name);
+  setSetting('license_activated_at', new Date().toISOString());
+  res.json({ ok: true, licensee: name });
+});
+
 app.get('/api/setup/status', (req, res) => {
   res.json({ setup_needed: agentsCount() === 0 });
 });
 
 app.get('/api/public/brand', (req, res) => {
-  res.json({ brand: getSetting('brand_name') || '' });
+  res.json({ brand: getSetting('brand_name') || '', licensee: getSetting('licensee_name') || '' });
 });
 
 app.post('/api/setup', (req, res) => {
@@ -416,6 +460,7 @@ async function maybeBotReply(msg, phoneNumberId = null) {
 // ---------- Webhook ----------
 
 app.get('/webhook', (req, res) => {
+  if (!licenseActivated()) return res.sendStatus(403);
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -428,6 +473,7 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', (req, res) => {
+  if (!licenseActivated()) return res.sendStatus(403);
   res.sendStatus(200);
   try {
     const keys = Object.keys(req.body ?? {});

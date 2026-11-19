@@ -62,6 +62,12 @@
   #setupForm .login-sub { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 6px; }
   #setupForm .btn { width: 100%; margin-top: 14px; }
   #setupForm .sec { color: var(--navy); font-size: 13px; font-weight: 700; margin: 14px 0 2px; border-top: 1px solid #e7e4dc; padding-top: 12px; }
+  #licenseForm { width: 430px; max-width: 100%; background: #fff; border-radius: 18px; padding: 30px 30px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: start; }
+  #licenseForm h3 { color: var(--navy); font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 2px; }
+  #licenseForm .login-sub { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 6px; }
+  #licenseForm .btn { width: 100%; margin-top: 14px; }
+  #licenseForm .install-code { direction: ltr; text-align: center; font-family: monospace; font-size: 24px; letter-spacing: 4px; background: #f4f2ec; border: 1px dashed var(--gold); border-radius: 10px; padding: 10px; margin: 8px 0; color: var(--navy); font-weight: 700; }
+  #licenseForm textarea { width: 100%; min-height: 90px; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px; direction: ltr; resize: vertical; }
   .brand-initial { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 20px; }
   .brand-initial.big { width: 72px; height: 72px; margin: 0 auto 14px; background: var(--navy); border-radius: 18px; font-size: 34px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; }
   #loginPass { width: 100%; background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 11px 13px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
@@ -220,10 +226,22 @@
 </head>
 <body>
 <div id="loginOverlay" hidden>
+  <form id="licenseForm" hidden>
+    <div class="brand-initial big">و</div>
+    <h3>تفعيل المنصة</h3>
+    <div class="login-sub">هذه النسخة مدفوعة. بعد تحويل المبلغ للبائع، أرسل له كود التثبيت الظاهر بالأسفل ليصلك كود التفعيل.</div>
+    <div class="err" id="licErr"></div>
+    <label>كود التثبيت (أرسله للبائع)</label>
+    <div class="install-code" id="licInstance">…</div>
+    <label>كود التفعيل (يصلك من البائع بعد التحويل)</label>
+    <textarea id="licKey" placeholder="الصق كود التفعيل هنا"></textarea>
+    <button class="btn" type="submit">تفعيل</button>
+  </form>
   <form id="loginForm">
     <div class="brand-initial big" id="brandInitLogin">و</div>
     <h3>تسجيل الدخول</h3>
     <div class="login-sub" id="loginBrandSub">منصة واتساب للأعمال</div>
+    <div class="login-sub" id="loginLicensee" style="font-size:11px" hidden></div>
     <div class="gold-line"></div>
     <div class="err" id="loginErr"></div>
     <label>اسم المستخدم</label>
@@ -899,6 +917,9 @@ async function applyBrand() {
   try {
     const b = await fetch('/api/public/brand').then((r) => r.json());
     BRAND = (b.brand || '').trim();
+    const lic = (b.licensee || '').trim();
+    const el = $('loginLicensee');
+    if (el && lic) { el.textContent = 'مرخّصة لـ ' + lic; el.hidden = false; }
   } catch { BRAND = ''; }
   const label = BRAND || 'منصة واتساب للأعمال';
   $('headBrandSub').textContent = label;
@@ -913,6 +934,24 @@ const api = async (url, opts) => {
   if (res.status === 401 && !url.includes('/auth/')) { showLogin(true); throw Object.assign(new Error(data.error || res.status), { data, auth: true }); }
   if (!res.ok) throw Object.assign(new Error(data.error || res.status), { data });
   return data;
+};
+
+$('licenseForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('licErr').style.display = 'none';
+  try {
+    const r = await fetch('/api/license/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: $('licKey').value.trim() }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || r.status);
+    location.reload();
+  } catch (err) {
+    $('licErr').textContent = err.message;
+    $('licErr').style.display = 'block';
+  }
 };
 
 $('setupForm').onsubmit = async (e) => {
@@ -2229,6 +2268,17 @@ $('wcSave').onclick = async () => {
 window.delRule = delRule;
 
 (async () => {
+  let lic = { activated: true };
+  try {
+    lic = await fetch('/api/license/status').then((r) => r.json());
+  } catch {}
+  if (!lic.activated) {
+    $('licInstance').textContent = lic.instance_id || '—';
+    showLogin(true);
+    $('licenseForm').hidden = false;
+    $('loginForm').hidden = true;
+    return;
+  }
   await applyBrand();
   try {
     const { agent } = await api('/api/me');
