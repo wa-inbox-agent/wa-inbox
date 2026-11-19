@@ -288,7 +288,7 @@ export function upsertInbound({ waId, phoneNumberId = null, name, waMessageId, t
 
 // ===== إعادة إرسال الرسائل الفاشلة =====
 
-export function failedForRetry(now = nowMs()) {
+export function failedForRetry(now = Date.now()) {
   return db.prepare(`SELECT * FROM messages WHERE direction = 'outbound' AND status = 'failed'
     AND COALESCE(retry_count, 0) < 3 AND (next_retry_at IS NULL OR next_retry_at <= ?)`).all(now);
 }
