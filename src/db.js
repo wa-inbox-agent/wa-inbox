@@ -142,6 +142,16 @@ try { db.exec(`ALTER TABLE campaigns ADD COLUMN body_params TEXT`); } catch {}
 try { db.exec(`ALTER TABLE bot_rules ADD COLUMN phone_number_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN quoted_wa_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE conversations ADD COLUMN labels TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE agents ADD COLUMN phone_number_id TEXT`); } catch {}
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS csat_ratings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wa_id TEXT NOT NULL,
+  phone_number_id TEXT,
+  rating INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);`)
 
 // ---------- تعدد الأرقام (قسم مستقل لكل رقم واتساب) ----------
 try {
@@ -299,6 +309,18 @@ export function updateStatus(waMessageId, status) {
 
 export function listConversations(agent = null) {
   if (agent && agent.role !== 'admin') {
+    if (agent.phone_number_id) {
+      // موظف مربوط بقسم: يرى محادثات قسمه فقط
+      return db
+        .prepare(
+          `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
+           LEFT JOIN agents a ON a.id = c.assigned_to
+           LEFT JOIN phone_numbers pn ON pn.phone_number_id = c.phone_number_id
+           WHERE c.phone_number_id = ?
+           ORDER BY c.last_message_at DESC`
+        )
+        .all(agent.phone_number_id);
+    }
     return db
       .prepare(
         `SELECT c.*, a.name AS assigned_name, pn.label AS dept_label, pn.display_number AS dept_number FROM conversations c
@@ -324,6 +346,36 @@ export function setConversationLabels(waId, labels, phoneNumberId = null) {
   db.prepare(`UPDATE conversations SET labels = ? WHERE wa_id = ? AND phone_number_id = ?`).run(String(labels ?? '').trim(), waId, pn);
 }
 
+// تحويل محادثة من قسم (رقم) لقسم آخر: المحادثة والرسايل بتتنقل للرقم الجديد
+export function transferConversation(waId, fromPn, toPn) {
+  const from = fromPn ?? defaultPhoneNumberId();
+  db.exec('BEGIN');
+  try {
+    db.prepare(`UPDATE messages SET phone_number_id = ? WHERE wa_id = ? AND phone_number_id = ?`).run(toPn, waId, from);
+    const row = db.prepare(`SELECT * FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, from);
+    if (row) {
+      db.prepare(`DELETE FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).run(waId, from);
+      db.prepare(
+        `INSERT INTO conversations (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status, labels)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(waId, toPn, row.name, row.last_message, row.last_message_at, 0, row.bot_enabled, null, null, row.last_after_hours_at, row.status, row.labels ?? '');
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+export function addCsatRating(waId, phoneNumberId, rating) {
+  db.prepare(`INSERT INTO csat_ratings (wa_id, phone_number_id, rating, created_at) VALUES (?, ?, ?, ?)`).run(waId, phoneNumberId ?? null, rating, now());
+}
+
+export function csatStats() {
+  const row = db.prepare(`SELECT COUNT(*) AS count, ROUND(AVG(rating), 1) AS avg FROM csat_ratings`).get();
+  return { count: row.count ?? 0, avg: row.avg ?? null };
+}
+
 export function assignConversation(waId, agentId, phoneNumberId = null) {
   const pn = phoneNumberId ?? defaultPhoneNumberId();
   db.prepare(`UPDATE conversations SET assigned_to = ? WHERE wa_id = ? AND phone_number_id = ?`).run(agentId, waId, pn);
@@ -331,15 +383,19 @@ export function assignConversation(waId, agentId, phoneNumberId = null) {
 
 // ---------- الموظفون ----------
 
-export function createAgent({ username, name, passHash, role = 'agent' }) {
+export function createAgent({ username, name, passHash, role = 'agent', phoneNumberId = null }) {
   const r = db
-    .prepare(`INSERT INTO agents (username, name, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .run(username, name, passHash, role, now());
+    .prepare(`INSERT INTO agents (username, name, pass_hash, role, phone_number_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(username, name, passHash, role, phoneNumberId || null, now());
   return Number(r.lastInsertRowid);
 }
 
+export function setAgentDept(id, phoneNumberId = null) {
+  db.prepare(`UPDATE agents SET phone_number_id = ? WHERE id = ?`).run(phoneNumberId || null, id);
+}
+
 export function listAgents() {
-  return db.prepare(`SELECT id, username, name, role, active, created_at FROM agents ORDER BY id ASC`).all();
+  return db.prepare(`SELECT id, username, name, role, active, created_at, phone_number_id FROM agents ORDER BY id ASC`).all();
 }
 
 export function getAgentByUsername(username) {
@@ -673,6 +729,7 @@ export function usageSummary() {
     conversations: db.prepare(`SELECT count(*) AS n FROM conversations`).get().n,
     openConversations: db.prepare(`SELECT count(*) AS n FROM conversations WHERE status = 'open'`).get().n,
     contacts: db.prepare(`SELECT count(*) AS n FROM contacts`).get().n,
+    csat: csatStats(),
     optedOut: db.prepare(`SELECT count(*) AS n FROM contacts WHERE opted_out = 1`).get().n,
     campaignMessages: db.prepare(`SELECT count(*) AS n FROM campaign_recipients WHERE status IN ('sent','delivered','read')`).get().n,
   };

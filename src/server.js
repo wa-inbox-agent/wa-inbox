@@ -65,6 +65,9 @@ import {
   deleteCanned,
   listNotes,
   addNote,
+  setAgentDept,
+  transferConversation,
+  addCsatRating,
   logWebhookEvent,
   recentWebhookEvents,
   resetFailedRecipients,
@@ -174,13 +177,19 @@ app.get('/api/agents', requireAdmin, (req, res) => {
 });
 
 app.post('/api/agents', requireAdmin, (req, res) => {
-  const { username, name, password, role } = req.body ?? {};
+  const { username, name, password, role, phone_number_id } = req.body ?? {};
   if (!username?.trim() || !name?.trim() || !password || String(password).length < 6) {
     return res.status(400).json({ error: 'اسم المستخدم والاسم وكلمة سر من 6 أحرف على الأقل مطلوبة' });
   }
   if (getAgentByUsername(username.trim())) return res.status(409).json({ error: 'اسم المستخدم مستخدم بالفعل' });
-  const id = createAgent({ username: username.trim(), name: name.trim(), passHash: hashPassword(String(password)), role: role === 'admin' ? 'admin' : 'agent' });
+  const id = createAgent({ username: username.trim(), name: name.trim(), passHash: hashPassword(String(password)), role: role === 'admin' ? 'admin' : 'agent', phoneNumberId: phone_number_id ? String(phone_number_id) : null });
   res.json({ ok: true, id });
+});
+
+// ربط موظف بقسم (رقم واتساب) - أو فك الربط بـ null
+app.post('/api/agents/:id/dept', requireAdmin, (req, res) => {
+  setAgentDept(Number(req.params.id), req.body?.phone_number_id ? String(req.body.phone_number_id) : null);
+  res.json({ ok: true });
 });
 
 app.post('/api/agents/:id/toggle', requireAdmin, (req, res) => {
@@ -262,6 +271,17 @@ async function sendBotMenu(waId, rule, phoneNumberId = null) {
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
 async function maybeBotReply(msg, phoneNumberId = null) {
   if (msg.type !== 'text' && msg.type !== 'interactive') return;
+  // رد على تقييم العميل (CSAT) قبل أي منطق بوت
+  const csatSelId = msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null;
+  const csatMatch = /^csat_([1-5])$/.exec(String(csatSelId ?? ''));
+  if (csatMatch) {
+    addCsatRating(msg.from, phoneNumberId, Number(csatMatch[1]));
+    try {
+      await sendText(msg.from, 'شكرًا لتقييمك! نتشرف بخدمتك دائمًا. 🌹', phoneNumberId);
+      insertOutbound({ waId: msg.from, body: 'شكرًا لتقييمك! نتشرف بخدمتك دائمًا. 🌹', phoneNumberId, bot: true });
+    } catch {}
+    return;
+  }
   if (!getBotSettings().enabled) return;
   if (!getConversationBot(msg.from, phoneNumberId)) return;
   const text = msg.text?.body ?? msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? '';
@@ -832,6 +852,21 @@ app.get('/api/reports/summary', (req, res) => {
 app.post('/api/conversations/:waId/status', (req, res) => {
   const status = req.body?.status === 'closed' ? 'closed' : 'open';
   setConversationStatus(req.params.waId, status, req.body?.pn ?? null);
+  // عند إقفال المحادثة نبعت للعميل تقييم الخدمة (في الخلفية - لا يعطّل الرد)
+  if (status === 'closed' && configured()) {
+    const pn = req.body?.pn ? String(req.body.pn) : defaultPhoneNumberId();
+    const rows = [5, 4, 3, 2, 1].map((n) => ({
+      id: `csat_${n}`,
+      title: `${'⭐'.repeat(n)} (${n}/5)`,
+    }));
+    sendInteractive(req.params.waId, {
+      type: 'list',
+      header: { type: 'text', text: 'غرفة الأعمال' },
+      body: { text: 'شكرًا لتواصلك معنا! من فضلك قيّم تجربتك مع خدمتنا:' },
+      footer: { text: 'تقييمك يساعدنا على التحسن' },
+      action: { button: 'قيّم الخدمة', sections: [{ title: 'التقييم', rows }] },
+    }, pn).catch(() => {});
+  }
   res.json({ ok: true, status });
 });
 
@@ -865,6 +900,23 @@ app.post('/api/conversations/:waId/notes', (req, res) => {
   if (!body) return res.status(400).json({ error: 'الملاحظة فارغة' });
   const id = addNote(req.params.waId, req.agent?.name ?? null, body);
   res.json({ ok: true, id });
+});
+
+// تحويل المحادثة من قسم (رقم) لقسم آخر
+app.post('/api/conversations/:waId/transfer', (req, res) => {
+  const to = req.body?.to_phone_number_id ? String(req.body.to_phone_number_id) : '';
+  const from = req.body?.from_phone_number_id ? String(req.body.from_phone_number_id) : defaultPhoneNumberId();
+  if (!to || to === from) return res.status(400).json({ error: 'اختار القسم المستهدف' });
+  try {
+    transferConversation(req.params.waId, from, to);
+    const numbers = listPhoneNumbers();
+    const fromLabel = numbers.find((n) => n.phone_number_id === from)?.label ?? from;
+    const toLabel = numbers.find((n) => n.phone_number_id === to)?.label ?? to;
+    addNote(req.params.waId, req.agent?.name ?? 'النظام', `تم تحويل المحادثة من "${fromLabel}" إلى "${toLabel}"`);
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'تعذر التحويل' });
+  }
 });
 
 // ---------- الردود الجاهزة ----------
