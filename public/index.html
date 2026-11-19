@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>غرفة جازان | منصة واتساب</title>
+<title>منصة واتساب للأعمال</title>
 <link rel="icon" type="image/png" href="/favicon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -57,6 +57,13 @@
   #loginForm .login-sub { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 6px; }
   #loginForm .gold-line { width: 56px; height: 3px; border-radius: 3px; background: var(--gold); margin: 10px auto 16px; }
   #loginForm .btn { width: 100%; margin-top: 16px; }
+  #setupForm { width: 430px; max-width: 100%; background: #fff; border-radius: 18px; padding: 30px 30px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: start; max-height: 92vh; overflow-y: auto; }
+  #setupForm h3 { color: var(--navy); font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 2px; }
+  #setupForm .login-sub { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 6px; }
+  #setupForm .btn { width: 100%; margin-top: 14px; }
+  #setupForm .sec { color: var(--navy); font-size: 13px; font-weight: 700; margin: 14px 0 2px; border-top: 1px solid #e7e4dc; padding-top: 12px; }
+  .brand-initial { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 20px; }
+  .brand-initial.big { width: 72px; height: 72px; margin: 0 auto 14px; background: var(--navy); border-radius: 18px; font-size: 34px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; }
   #loginPass { width: 100%; background: var(--field); border: 1px solid var(--border-2); border-radius: 10px; padding: 11px 13px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
   #loginPass:focus { border-color: var(--navy-3); box-shadow: 0 0 0 3px rgba(46,56,115,.13); }
 
@@ -214,9 +221,9 @@
 <body>
 <div id="loginOverlay" hidden>
   <form id="loginForm">
-    <div class="login-logo"><img src="/logo.png" alt="Jazan Chamber" /></div>
+    <div class="brand-initial big" id="brandInitLogin">و</div>
     <h3>تسجيل الدخول</h3>
-    <div class="login-sub">منصة واتساب للأعمال</div>
+    <div class="login-sub" id="loginBrandSub">منصة واتساب للأعمال</div>
     <div class="gold-line"></div>
     <div class="err" id="loginErr"></div>
     <label>اسم المستخدم</label>
@@ -225,11 +232,37 @@
     <input type="password" id="loginPass" autocomplete="current-password" />
     <button class="btn" type="submit">دخول</button>
   </form>
+  <form id="setupForm" hidden>
+    <div class="brand-initial big">و</div>
+    <h3>مرحبًا بك! لنبدأ الإعداد</h3>
+    <div class="login-sub">أول استخدام للمنصة: أنشئ حساب المدير وحدد اسم نشاطك. بيانات ميتا اختيارية ويمكن إدخالها لاحقًا من صفحة المطورين.</div>
+    <div class="err" id="setupErr"></div>
+    <div class="sec">نشاطك التجاري</div>
+    <label>اسم النشاط (يظهر في واجهة المنصة)</label>
+    <input type="text" id="suBrand" placeholder="مثال: مؤسسة النخبة" />
+    <div class="sec">حساب المدير</div>
+    <label>اسم المستخدم (إنجليزي بدون مسافات)</label>
+    <input type="text" id="suUser" dir="ltr" autocomplete="username" />
+    <label>الاسم</label>
+    <input type="text" id="suName" />
+    <label>كلمة السر (6 أحرف على الأقل)</label>
+    <input type="password" id="suPass" autocomplete="new-password" />
+    <div class="sec">ربط واتساب للأعمال (ميتا) — اختياري الآن</div>
+    <label>Phone Number ID</label>
+    <input type="text" id="suPn" dir="ltr" />
+    <label>WhatsApp Business Account ID</label>
+    <input type="text" id="suWaba" dir="ltr" />
+    <label>Access Token</label>
+    <input type="text" id="suToken" dir="ltr" />
+    <label>Verify Token (كلمة سر تختارها للربط مع ميتا)</label>
+    <input type="text" id="suVerify" dir="ltr" />
+    <button class="btn" type="submit">إنشاء الحساب وبدء العمل</button>
+  </form>
 </div>
 <header>
   <div class="brand">
-    <div class="logo-tile"><img src="/logo.png" alt="Jazan Chamber" /></div>
-    <div class="brand-sub">منصة واتساب للأعمال</div>
+    <div class="logo-tile"><div class="brand-initial" id="brandInitHead">و</div></div>
+    <div class="brand-sub" id="headBrandSub">منصة واتساب للأعمال</div>
   </div>
   <nav>
     <button data-view="dashboard" class="active"><span class="ico">📊</span>لوحة التحكم</button>
@@ -647,6 +680,22 @@
       <div id="keyResult" class="hint" dir="ltr" style="direction:ltr;text-align:left;margin-top:10px;word-break:break-all"></div>
       <div class="hint">المفتاح يظهر مرة واحدة هنا فقط — انسخه فورًا. الاستخدام: POST إلى <span dir="ltr">/api/outbound/send</span> مع هيدر <span dir="ltr">X-API-Key</span> وجسم <span dir="ltr">{"to":"9665…","text":"…"}</span> أو <span dir="ltr">{"to":"9665…","template_name":"…"}</span>.</div>
     </div>
+    <div class="card" id="metaCard">
+      <h3>ربط واتساب للأعمال (ميتا)</h3>
+      <div class="err" id="metaErr"></div>
+      <label>اسم النشاط التجاري</label>
+      <input type="text" id="mtBrand" />
+      <label>Phone Number ID</label>
+      <input type="text" id="mtPn" dir="ltr" />
+      <label>WhatsApp Business Account ID</label>
+      <input type="text" id="mtWaba" dir="ltr" />
+      <label>Access Token <span class="hint" id="mtTokenHint"></span></label>
+      <input type="text" id="mtToken" dir="ltr" placeholder="اتركه فارغًا للإبقاء على الحالي" />
+      <label>Verify Token</label>
+      <input type="text" id="mtVerify" dir="ltr" />
+      <div class="hint">عنوان الـ Webhook الذي تضعه في لوحة ميتا: <span dir="ltr" id="mtHookUrl"></span> مع الـ Verify Token أعلاه.</div>
+      <button class="btn" id="mtSave">حفظ</button>
+    </div>
     <div class="card">
       <h3>المفاتيح <button class="btn secondary" style="padding:4px 12px;font-size:12px" onclick="loadKeys()">تحديث</button></h3>
       <table id="keyTable"><thead><tr><th>الاسم</th><th>أنشئ</th><th>آخر استخدام</th><th></th></tr></thead><tbody></tbody></table>
@@ -835,7 +884,7 @@ function applyLang() {
   });
   const lb = document.getElementById('langBtn');
   if (lb) lb.textContent = LANG === 'ar' ? 'English' : 'العربية';
-  document.title = LANG === 'ar' ? 'غرفة جازان | منصة واتساب' : 'Jazan Chamber | WhatsApp Platform';
+  document.title = LANG === 'ar' ? (BRAND ? BRAND + ' | منصة واتساب' : 'منصة واتساب للأعمال') : (BRAND ? BRAND + ' | WhatsApp Platform' : 'WhatsApp Business Platform');
 }
 document.getElementById('langBtn')?.addEventListener('click', () => {
   localStorage.setItem('lang', LANG === 'ar' ? 'en' : 'ar');
@@ -844,13 +893,83 @@ document.getElementById('langBtn')?.addEventListener('click', () => {
 applyLang();
 
 let me = null;
+let BRAND = '';
 const showLogin = (show) => { $('loginOverlay').hidden = !show; };
+async function applyBrand() {
+  try {
+    const b = await fetch('/api/public/brand').then((r) => r.json());
+    BRAND = (b.brand || '').trim();
+  } catch { BRAND = ''; }
+  const label = BRAND || 'منصة واتساب للأعمال';
+  $('headBrandSub').textContent = label;
+  $('loginBrandSub').textContent = label;
+  $('brandInitLogin').textContent = (BRAND || 'و').trim()[0];
+  $('brandInitHead').textContent = (BRAND || 'و').trim()[0];
+  document.title = LANG === 'ar' ? (BRAND ? BRAND + ' | منصة واتساب' : 'منصة واتساب للأعمال') : (BRAND ? BRAND + ' | WhatsApp Platform' : 'WhatsApp Business Platform');
+}
 const api = async (url, opts) => {
   const res = await fetch(url, opts ? { method: opts.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined } : undefined);
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && !url.includes('/auth/')) { showLogin(true); throw Object.assign(new Error(data.error || res.status), { data, auth: true }); }
   if (!res.ok) throw Object.assign(new Error(data.error || res.status), { data });
   return data;
+};
+
+$('setupForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('setupErr').style.display = 'none';
+  try {
+    await fetch('/api/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        brand_name: $('suBrand').value.trim(),
+        username: $('suUser').value.trim(),
+        name: $('suName').value.trim(),
+        password: $('suPass').value,
+        phone_number_id: $('suPn').value.trim(),
+        waba_id: $('suWaba').value.trim(),
+        wa_token: $('suToken').value.trim(),
+        wa_verify_token: $('suVerify').value.trim(),
+      }),
+    }).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || r.status); return d; });
+    location.reload();
+  } catch (err) {
+    $('setupErr').textContent = err.message;
+    $('setupErr').style.display = 'block';
+  }
+};
+
+async function loadMetaSettings() {
+  try {
+    const m = await api('/api/settings/meta');
+    $('mtBrand').value = m.brand_name || '';
+    $('mtPn').value = m.phone_number_id || '';
+    $('mtWaba').value = m.waba_id || '';
+    $('mtVerify').value = m.wa_verify_token || '';
+    $('mtTokenHint').textContent = m.wa_token_masked ? `(الحالي: ${m.wa_token_masked})` : '(غير مُدخل بعد)';
+    $('mtHookUrl').textContent = location.origin + '/webhook';
+  } catch {}
+}
+$('mtSave').onclick = async () => {
+  $('metaErr').style.display = 'none';
+  try {
+    const body = {
+      brand_name: $('mtBrand').value.trim(),
+      phone_number_id: $('mtPn').value.trim(),
+      waba_id: $('mtWaba').value.trim(),
+      wa_verify_token: $('mtVerify').value.trim(),
+    };
+    if ($('mtToken').value.trim()) body.wa_token = $('mtToken').value.trim();
+    await api('/api/settings/meta', { body });
+    $('mtToken').value = '';
+    await applyBrand();
+    await loadMetaSettings();
+    alert(t9n('تم الحفظ'));
+  } catch (err) {
+    $('metaErr').textContent = err.message;
+    $('metaErr').style.display = 'block';
+  }
 };
 
 $('loginForm').onsubmit = async (e) => {
@@ -979,7 +1098,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   if (b.dataset.view === 'contacts') loadContacts();
   if (b.dataset.view === 'agents') loadAgents();
   if (b.dataset.view === 'reports') loadReports();
-  if (b.dataset.view === 'api') loadKeys();
+  if (b.dataset.view === 'api') { loadKeys(); loadMetaSettings(); }
   if (b.dataset.view === 'bot') { loadBot(); loadCanned(); loadWelcome(); }
 }));
 
@@ -2110,12 +2229,24 @@ $('wcSave').onclick = async () => {
 window.delRule = delRule;
 
 (async () => {
+  await applyBrand();
   try {
     const { agent } = await api('/api/me');
     await initMe(agent);
     showLogin(false);
   } catch {
-    showLogin(true);
+    try {
+      const st = await fetch('/api/setup/status').then((r) => r.json());
+      if (st.setup_needed) {
+        showLogin(true);
+        $('loginForm').hidden = true;
+        $('setupForm').hidden = false;
+      } else {
+        showLogin(true);
+      }
+    } catch {
+      showLogin(true);
+    }
   }
   loadHealth();
   loadConvos().catch(() => {});

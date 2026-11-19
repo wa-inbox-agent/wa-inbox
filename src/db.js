@@ -308,6 +308,9 @@ export function fullBackup() {
   for (const { name } of tables) {
     const rows = db.prepare(`SELECT * FROM "${name}"`).all();
     if (name === 'agents') for (const r of rows) delete r.pass_hash;
+    if (name === 'settings') {
+      for (const r of rows) if (r.key === 'wa_token' || r.key === 'wa_verify_token') r.value = '';
+    }
     out.tables[name] = rows;
   }
   return out;

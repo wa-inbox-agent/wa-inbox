@@ -91,11 +91,19 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const set = (v) => Boolean(v && !String(v).startsWith('SET_ME'));
+const storeVal = (key) => {
+  try {
+    return getSetting(key) || '';
+  } catch {
+    return '';
+  }
+};
+const verifyTokenNow = () => (set(VERIFY_TOKEN) ? VERIFY_TOKEN : storeVal('wa_verify_token'));
 const configured = () =>
-  set(process.env.PHONE_NUMBER_ID) &&
-  set(process.env.WABA_ID) &&
-  set(process.env.WHATSAPP_TOKEN) &&
-  set(VERIFY_TOKEN);
+  (set(process.env.PHONE_NUMBER_ID) || storeVal('wa_phone_number_id')) &&
+  (set(process.env.WABA_ID) || storeVal('wa_waba_id')) &&
+  (set(process.env.WHATSAPP_TOKEN) || storeVal('wa_token')) &&
+  Boolean(verifyTokenNow());
 
 const wrap = (fn) => async (req, res) => {
   try {
@@ -147,7 +155,7 @@ function readSession(req) {
 }
 
 // ملاحظة: داخل app.use('/api') يكون req.path بدون البادئة /api
-const PUBLIC_API = new Set(['/health', '/auth/login']);
+const PUBLIC_API = new Set(['/health', '/auth/login', '/setup', '/setup/status', '/public/brand']);
 app.use('/api', (req, res, next) => {
   if (PUBLIC_API.has(req.path) || req.path.startsWith('/outbound')) return next();
   const agent = readSession(req);
@@ -188,6 +196,59 @@ app.post('/api/auth/login', (req, res) => {
   loginAttempts.delete(uname);
   res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(signSession(agent.id))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
   res.json({ ok: true, agent: { id: agent.id, username: agent.username, name: agent.name, role: agent.role } });
+});
+
+// ---------- الإعداد الأولي للنسخة الجديدة (الإعداد الذاتي للمشتري) ----------
+
+app.get('/api/setup/status', (req, res) => {
+  res.json({ setup_needed: agentsCount() === 0 });
+});
+
+app.get('/api/public/brand', (req, res) => {
+  res.json({ brand: getSetting('brand_name') || '' });
+});
+
+app.post('/api/setup', (req, res) => {
+  if (agentsCount() !== 0) return res.status(403).json({ error: 'المنصة مُعدّة بالفعل' });
+  const { brand_name, username, name, password, phone_number_id, waba_id, wa_token, wa_verify_token } = req.body ?? {};
+  if (!username?.trim() || !password || String(password).length < 6) {
+    return res.status(400).json({ error: 'اسم المستخدم وكلمة سر من 6 أحرف على الأقل مطلوبة' });
+  }
+  const id = createAgent({
+    username: username.trim(),
+    name: name?.trim() || 'المدير',
+    passHash: hashPassword(String(password)),
+    role: 'admin',
+  });
+  if (brand_name?.trim()) setSetting('brand_name', brand_name.trim().slice(0, 60));
+  if (phone_number_id?.trim()) setSetting('wa_phone_number_id', phone_number_id.trim());
+  if (waba_id?.trim()) setSetting('wa_waba_id', waba_id.trim());
+  if (wa_token?.trim()) setSetting('wa_token', wa_token.trim());
+  if (wa_verify_token?.trim()) setSetting('wa_verify_token', wa_verify_token.trim());
+  res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(signSession(id))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`);
+  res.json({ ok: true });
+});
+
+// تحديث بيانات ميتا والعلامة التجارية من داخل المنصة (مدير فقط)
+app.get('/api/settings/meta', requireAdmin, (req, res) => {
+  const mask = (v) => (v ? '••••' + String(v).slice(-4) : '');
+  res.json({
+    brand_name: getSetting('brand_name') || '',
+    phone_number_id: getSetting('wa_phone_number_id') || '',
+    waba_id: getSetting('wa_waba_id') || '',
+    wa_token_masked: mask(getSetting('wa_token')),
+    wa_verify_token: getSetting('wa_verify_token') || '',
+  });
+});
+
+app.post('/api/settings/meta', requireAdmin, (req, res) => {
+  const { brand_name, phone_number_id, waba_id, wa_token, wa_verify_token } = req.body ?? {};
+  if (brand_name !== undefined) setSetting('brand_name', String(brand_name).trim().slice(0, 60));
+  if (phone_number_id !== undefined) setSetting('wa_phone_number_id', String(phone_number_id).trim());
+  if (waba_id !== undefined) setSetting('wa_waba_id', String(waba_id).trim());
+  if (wa_token !== undefined && String(wa_token).trim()) setSetting('wa_token', String(wa_token).trim());
+  if (wa_verify_token !== undefined) setSetting('wa_verify_token', String(wa_verify_token).trim());
+  res.json({ ok: true });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -359,7 +420,7 @@ app.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token && token === VERIFY_TOKEN) {
+  if (mode === 'subscribe' && token && token === verifyTokenNow()) {
     console.log('تم التحقق من الـ Webhook بنجاح');
     return res.status(200).send(challenge);
   }
@@ -1117,7 +1178,7 @@ app.get('/api/health', (req, res) => {
 const PORT = Number(process.env.PORT || 3000);
 app.listen(PORT, () => {
   console.log(`الخادم يعمل على http://localhost:${PORT}`);
-  if (!VERIFY_TOKEN || VERIFY_TOKEN === 'changeme-verify-token') {
-    console.warn('تنبيه: غيّر VERIFY_TOKEN في ملف .env');
+  if (!verifyTokenNow() || verifyTokenNow() === 'changeme-verify-token') {
+    console.warn('تنبيه: غيّر VERIFY_TOKEN في ملف .env أو من إعدادات المنصة');
   }
 });
