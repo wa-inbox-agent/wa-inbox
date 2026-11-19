@@ -57,6 +57,7 @@ import {
   setPhoneNumberLabel,
   deletePhoneNumber,
   defaultPhoneNumberId,
+  usageSummary,
   updateContact,
   getContact,
   listCanned,
@@ -68,7 +69,7 @@ import {
   recentWebhookEvents,
   resetFailedRecipients,
 } from './db.js';
-import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -628,6 +629,59 @@ app.post('/api/contacts/:phone/optout', (req, res) => {
 app.delete('/api/contacts/:phone', (req, res) => {
   deleteContact(req.params.phone);
   res.json({ ok: true });
+});
+
+// ---------- الملف التجاري (يظهر للعملاء في واتساب) ----------
+
+app.get('/api/business-profile', wrap(async (req, res) => {
+  res.json({ profile: await getBusinessProfile(req.query.pn || null) });
+}));
+
+app.post('/api/business-profile', wrap(async (req, res) => {
+  const { phone_number_id, about, address, description, email, vertical } = req.body ?? {};
+  const fields = {};
+  if (about !== undefined) fields.about = String(about).slice(0, 139);
+  if (address !== undefined) fields.address = String(address).slice(0, 256);
+  if (description !== undefined) fields.description = String(description).slice(0, 512);
+  if (email !== undefined) fields.email = String(email).slice(0, 128);
+  if (vertical !== undefined) fields.vertical = String(vertical);
+  if (Array.isArray(req.body?.websites)) fields.websites = req.body.websites.map((w) => String(w).trim()).filter((w) => /^https?:\/\//.test(w)).slice(0, 2);
+  await updateBusinessProfile(fields, phone_number_id || null);
+  res.json({ ok: true, profile: await getBusinessProfile(phone_number_id || null) });
+}));
+
+// ---------- إرسال سريع (قالب معتمد لقائمة أرقام قصيرة بدون حملة) ----------
+
+app.post('/api/quick-send', wrap(async (req, res) => {
+  const { template_name, language_code, header_link, header_type, phone_number_id } = req.body ?? {};
+  const numbers = [...new Set(
+    String(req.body?.numbers ?? '')
+      .split(/[\s,;]+/)
+      .map((n) => n.replace(/[^\d]/g, ''))
+      .filter((n) => n.length >= 8)
+  )].filter((p) => !isOptedOut(p)).slice(0, 100);
+  if (!template_name || !numbers.length) return res.status(400).json({ error: 'القالب وقائمة الأرقام مطلوبة (حتى 100 رقم)' });
+  const pn = phone_number_id || null;
+  const header = header_link ? { link: header_link, type: header_type ?? 'image' } : null;
+  const bodyParams = Array.isArray(req.body?.body_params) ? req.body.body_params.map((v) => String(v)) : [];
+  (async () => {
+    for (const n of numbers) {
+      try {
+        const result = await sendTemplateEx(n, template_name, language_code ?? 'ar', header, bodyParams, pn);
+        insertOutbound({ waId: n, phoneNumberId: pn, waMessageId: result?.messages?.[0]?.id, body: `[قالب: ${template_name}]`, type: 'template', sender: 'إرسال سريع' });
+      } catch (err) {
+        console.error(`فشل الإرسال السريع إلى ${n}:`, err.message);
+      }
+      await new Promise((r) => setTimeout(r, 1100));
+    }
+  })();
+  res.json({ ok: true, total: numbers.length });
+}));
+
+// ---------- ملخص الاستهلاك ----------
+
+app.get('/api/usage', (req, res) => {
+  res.json(usageSummary());
 });
 
 // ---------- الـ API الخارجي (إشعارات أنظمة الغرفة) ----------

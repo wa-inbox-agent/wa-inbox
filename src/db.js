@@ -612,6 +612,41 @@ export function reportSummary() {
   return { perDay, totals, campaigns, recipients, contacts, topConversations };
 }
 
+// ملخص الاستهلاك: اليوم وآخر 7 و30 يوم + توزيع على الأرقام
+export function usageSummary() {
+  const dayMs = 24 * 3600 * 1000;
+  const nowT = now();
+  const startOfDay = nowT - ((nowT + 3 * 3600 * 1000) % dayMs); // بتوقيت الرياض تقريبًا
+  const range = (since) => {
+    const r = db.prepare(
+      `SELECT
+        SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) AS inbound,
+        SUM(CASE WHEN direction = 'outbound' AND bot = 0 THEN 1 ELSE 0 END) AS outbound,
+        SUM(CASE WHEN direction = 'outbound' AND bot = 1 THEN 1 ELSE 0 END) AS bot
+       FROM messages WHERE created_at >= ?`
+    ).get(since);
+    return { inbound: r?.inbound ?? 0, outbound: r?.outbound ?? 0, bot: r?.bot ?? 0 };
+  };
+  const perNumber = db.prepare(
+    `SELECT m.phone_number_id, pn.label,
+      SUM(CASE WHEN m.direction = 'inbound' THEN 1 ELSE 0 END) AS inbound,
+      SUM(CASE WHEN m.direction = 'outbound' THEN 1 ELSE 0 END) AS outbound
+     FROM messages m LEFT JOIN phone_numbers pn ON pn.phone_number_id = m.phone_number_id
+     GROUP BY m.phone_number_id ORDER BY inbound DESC`
+  ).all();
+  return {
+    today: range(startOfDay),
+    last7: range(nowT - 7 * dayMs),
+    last30: range(nowT - 30 * dayMs),
+    perNumber,
+    conversations: db.prepare(`SELECT count(*) AS n FROM conversations`).get().n,
+    openConversations: db.prepare(`SELECT count(*) AS n FROM conversations WHERE status = 'open'`).get().n,
+    contacts: db.prepare(`SELECT count(*) AS n FROM contacts`).get().n,
+    optedOut: db.prepare(`SELECT count(*) AS n FROM contacts WHERE opted_out = 1`).get().n,
+    campaignMessages: db.prepare(`SELECT count(*) AS n FROM campaign_recipients WHERE status IN ('sent','delivered','read')`).get().n,
+  };
+}
+
 export function conversationExists(waId, phoneNumberId = null) {
   const pn = phoneNumberId ?? defaultPhoneNumberId();
   return !!db.prepare(`SELECT 1 FROM conversations WHERE wa_id = ? AND phone_number_id = ?`).get(waId, pn);

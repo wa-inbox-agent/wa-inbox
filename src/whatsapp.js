@@ -62,6 +62,21 @@ export async function sendTemplate(to, templateName, languageCode = 'ar', phoneN
   return data;
 }
 
+// الملف التجاري للنشاط على واتساب (يظهر للعملاء في صفحة الحساب)
+export async function getBusinessProfile(phoneNumberId = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  const data = await graph(`${phoneNumberId || PHONE_NUMBER_ID}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical`);
+  return data?.data?.[0] ?? null;
+}
+
+export async function updateBusinessProfile(fields, phoneNumberId = null) {
+  requireCreds('PHONE_NUMBER_ID', 'WHATSAPP_TOKEN');
+  return graph(`${phoneNumberId || PHONE_NUMBER_ID}/whatsapp_business_profile`, {
+    method: 'POST',
+    body: { messaging_product: 'whatsapp', ...fields },
+  });
+}
+
 // قائمة القوالب وحالاتها
 export async function listTemplates() {
   requireCreds('WABA_ID', 'WHATSAPP_TOKEN');
