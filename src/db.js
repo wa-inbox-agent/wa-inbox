@@ -273,6 +273,25 @@ export function addPendingPhoneNumber(phoneNumberId, label, displayNumber = null
     VALUES (?, ?, ?, 0, 0, ?)`).run(String(phoneNumberId), label, displayNumber ?? null, Date.now());
 }
 
+// ربط قسم غير متصل برقم واتساب فعلي (بعد تسجيله في ميتا) — ينقل كل البيانات المرتبطة للمعرّف الحقيقي
+export function connectPhoneNumber(pendingId, realPhoneNumberId, displayNumber = null) {
+  const pid = String(pendingId);
+  const rid = String(realPhoneNumberId);
+  db.exec('BEGIN');
+  try {
+    db.prepare(`UPDATE phone_numbers SET phone_number_id = ?, display_number = COALESCE(?, display_number), connected = 1 WHERE phone_number_id = ?`).run(rid, displayNumber ? String(displayNumber) : null, pid);
+    db.prepare(`UPDATE bot_rules SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    db.prepare(`UPDATE campaigns SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    db.prepare(`UPDATE agents SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    db.prepare(`UPDATE conversations SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    db.prepare(`UPDATE messages SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
 export function isConnectedPn(phoneNumberId) {
   if (!phoneNumberId) return true;
   const row = db.prepare(`SELECT connected FROM phone_numbers WHERE phone_number_id = ?`).get(String(phoneNumberId));
