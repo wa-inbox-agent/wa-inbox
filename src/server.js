@@ -1,3 +1,4 @@
+import {createEcommerce} from './ecommerce.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,6 +87,7 @@ import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual, verif
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+const mountEcommerceApi = createEcommerce({app,express,tenantId:()=>getSetting('instance_id'),isGlobalOptedOut:p=>isOptedOut(String(p).replace(/\D/g,'')),requireAdmin});
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -225,6 +227,8 @@ function requireAdmin(req, res, next) {
   if (req.agent?.role !== 'admin') return res.status(403).json({ error: 'صلاحية المدير مطلوبة' });
   next();
 }
+
+mountEcommerceApi();
 
 // قفل مؤقت بعد محاولات دخول فاشلة متكررة
 const loginAttempts = new Map(); // username -> { count, lockedUntil }
