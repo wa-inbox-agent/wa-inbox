@@ -15,6 +15,7 @@ async function graph(pathname, { method = 'GET', body } = {}) {
   requireCreds('WHATSAPP_TOKEN');
   const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${pathname}`, {
     method,
+    signal: AbortSignal.timeout(15000),
     headers: {
       Authorization: `Bearer ${TOKEN}`,
       'Content-Type': 'application/json',
@@ -29,6 +30,38 @@ async function graph(pathname, { method = 'GET', body } = {}) {
     throw err;
   }
   return data;
+}
+
+// Read-only, fail-closed asset check before a local department can be linked.
+export async function verifyNumberForLink(phoneNumberId, displayNumber) {
+  requireCreds('WABA_ID', 'WHATSAPP_TOKEN');
+  const id = String(phoneNumberId ?? '').trim();
+  const rawDisplay = String(displayNumber ?? '').trim();
+  if (!/^\d{8,25}$/.test(id)) throw new Error('معرّف الرقم غير صالح');
+  if (!/^\+?[1-9][0-9 ()-]{6,24}$/.test(rawDisplay)) throw new Error('الرقم الظاهر مطلوب بالصيغة الدولية');
+  const normalize = (v) => String(v ?? '').replace(/[^0-9]/g, '');
+  const expected = normalize(rawDisplay);
+  if (expected.length < 7 || expected.length > 15) throw new Error('الرقم الظاهر غير صالح');
+  let after = null;
+  let found = null;
+  const seen = new Set();
+  for (let page = 0; page < 100; page++) {
+    const suffix = after ? '&after=' + encodeURIComponent(after) : '';
+    const result = await graph(`${WABA_ID}/phone_numbers?fields=id,display_phone_number&limit=100${suffix}`);
+    if (!Array.isArray(result.data)) throw new Error('تعذر التحقق من أرقام الحساب لدى ميتا');
+    found = result.data.find((p) => String(p.id) === id);
+    if (found) break;
+    if (!result.paging?.next) break;
+    after = result.paging?.cursors?.after;
+    if (!after || seen.has(after)) throw new Error('تعذر إكمال التحقق من أرقام الحساب');
+    seen.add(after);
+  }
+  if (!found) throw new Error('الرقم غير موجود ضمن حساب واتساب المهيأ أو لا يملك المفتاح صلاحية الوصول إليه');
+  if (!found.display_phone_number || normalize(found.display_phone_number) !== expected) throw new Error('الرقم الظاهر لا يطابق معرّف الرقم المسجل لدى ميتا');
+  const detail = await graph(`${id}?fields=id,display_phone_number,status,platform_type`);
+  if (String(detail.id) !== id || normalize(detail.display_phone_number) !== expected) throw new Error('تعذر تأكيد تطابق بيانات الرقم لدى ميتا');
+  if (detail.status !== 'CONNECTED' || detail.platform_type !== 'CLOUD_API') throw new Error('الرقم غير متصل بخدمة Cloud API لدى ميتا. أكمل تسجيله أولاً');
+  return { id, display_number: detail.display_phone_number };
 }
 
 // إرسال رسالة نصية (داخل نافذة الـ 24 ساعة فقط)
@@ -228,4 +261,4 @@ export async function sendTemplateEx(to, templateName, languageCode = 'ar', head
     body: { messaging_product: 'whatsapp', to, type: 'template', template },
   });
   return data;
-}
+                                          }
