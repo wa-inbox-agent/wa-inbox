@@ -83,7 +83,7 @@ import {
   markRetrySucceeded,
   fullBackup,
 } from './db.js';
-import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile, getNumberQuality } from './whatsapp.js';
+import { sendText, sendTemplate, sendTemplateEx, sendMedia, sendMediaId, sendInteractive, uploadMedia, getMediaUrl, downloadMedia, listTemplates, createTemplate, deleteTemplate, getBusinessProfile, updateBusinessProfile, getNumberQuality, verifyNumberForLink } from './whatsapp.js';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -494,15 +494,31 @@ app.post('/api/phone-numbers', requireAdmin, (req, res) => {
 });
 
 // ربط قسم غير متصل برقم واتساب مسجّل في ميتا (نفس الـ WABA) — للمدير فقط
-app.post('/api/phone-numbers/:id/connect', requireAdmin, (req, res) => {
-  const realId = String(req.body?.phone_number_id ?? '').replace(/[^\d]/g, '');
-  if (!realId || realId.length < 8) return res.status(400).json({ error: 'معرّف الرقم من ميتا (phone_number_id) مطلوب' });
-  const row = listPhoneNumbers().find((p) => p.phone_number_id === req.params.id);
-  if (!row) return res.status(404).json({ error: 'القسم غير موجود' });
-  if (row.connected) return res.status(400).json({ error: 'هذا القسم متصل بالفعل' });
-  if (listPhoneNumbers().some((p) => p.phone_number_id === realId)) return res.status(409).json({ error: 'هذا الرقم مربوط بقسم آخر' });
-  connectPhoneNumber(req.params.id, realId, req.body?.display_number ? String(req.body.display_number) : null);
-  res.json({ ok: true, phone_numbers: listPhoneNumbers() });
+app.post('/api/phone-numbers/:id/connect', requireAdmin, async (req, res) => {
+  const realId = String(req.body?.phone_number_id ?? '').trim();
+  const displayNumber = String(req.body?.display_number ?? '').trim();
+  if (!/^\d{8,25}$/.test(realId)) return res.status(400).json({ error: 'معرّف الرقم من ميتا غير صالح' });
+  if (!displayNumber) return res.status(400).json({ error: 'الرقم الظاهر للعملاء مطلوب' });
+  const checkLocal = () => {
+    const rows = listPhoneNumbers();
+    const row = rows.find((p) => p.phone_number_id === req.params.id);
+    if (!row) return [404, 'القسم غير موجود'];
+    if (row.connected) return [400, 'هذا القسم متصل بالفعل'];
+    if (rows.some((p) => p.phone_number_id === realId)) return [409, 'هذا الرقم مربوط بقسم آخر'];
+    return null;
+  };
+  const invalid = checkLocal();
+  if (invalid) return res.status(invalid[0]).json({ error: invalid[1] });
+  try {
+    const verified = await verifyNumberForLink(realId, displayNumber);
+    // Recheck after the network wait, before the synchronous transaction.
+    const changed = checkLocal();
+    if (changed) return res.status(changed[0]).json({ error: changed[1] });
+    connectPhoneNumber(req.params.id, verified.id, verified.display_number);
+    res.json({ ok: true, phone_numbers: listPhoneNumbers() });
+  } catch {
+    res.status(422).json({ error: 'لم يتم الربط: تعذر تأكيد أن الرقم متصل بخدمة Cloud API على نفس حساب ميتا ويطابق الرقم الظاهر. راجع البيانات والصلاحيات وحاول لاحقًا.' });
+  }
 });
 
 app.post('/api/phone-numbers/:id/label', (req, res) => {
