@@ -168,6 +168,9 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
 )`);
 } catch {}
 
+try { db.exec(`ALTER TABLE phone_numbers ADD COLUMN welcome_message TEXT`); } catch {}
+try { db.exec(`ALTER TABLE phone_numbers ADD COLUMN after_hours_message TEXT`); } catch {}
+
 const ENV_PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID && !String(process.env.PHONE_NUMBER_ID).startsWith('SET_ME') ? String(process.env.PHONE_NUMBER_ID) : null;
 if (ENV_PHONE_NUMBER_ID) {
   try {
@@ -248,6 +251,19 @@ export function registerPhoneNumber(phoneNumberId, displayNumber = null) {
 
 export function setPhoneNumberLabel(phoneNumberId, label) {
   db.prepare(`UPDATE phone_numbers SET label = ? WHERE phone_number_id = ?`).run(label, String(phoneNumberId));
+}
+
+// نصوص الترحيب/خارج الدوام الخاصة برقم معيّن (فارغة = استخدام النص العام)
+export function getPhoneNumberGreeting(phoneNumberId, kind) {
+  const col = kind === 'welcome_message' ? 'welcome_message' : 'after_hours_message';
+  const row = db.prepare(`SELECT ${col} AS m FROM phone_numbers WHERE phone_number_id = ?`).get(phoneNumberId ?? '');
+  const v = row?.m?.trim();
+  return v || null;
+}
+
+export function setPhoneNumberGreetings(phoneNumberId, { welcome_message, after_hours_message }) {
+  if (welcome_message !== undefined) db.prepare(`UPDATE phone_numbers SET welcome_message = ? WHERE phone_number_id = ?`).run(String(welcome_message ?? '').trim() || null, phoneNumberId);
+  if (after_hours_message !== undefined) db.prepare(`UPDATE phone_numbers SET after_hours_message = ? WHERE phone_number_id = ?`).run(String(after_hours_message ?? '').trim() || null, phoneNumberId);
 }
 
 export function deletePhoneNumber(phoneNumberId) {
