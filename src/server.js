@@ -742,7 +742,6 @@ app.post('/api/campaigns', (req, res) => {
   const bodyParams = Array.isArray(req.body?.body_params) ? req.body.body_params.map((v) => String(v)) : [];
   const scopeC = deptScope(req);
   const campPn = scopeC || (req.body?.phone_number_id ? String(req.body.phone_number_id) : null);
-  if (pnDisconnected(res, campPn)) return;
   const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null, bodyParams, phoneNumberId: campPn });
   res.json({ ok: true, id, total: cleaned.length, scheduled: Boolean(sched) });
 });
@@ -774,6 +773,7 @@ async function runCampaign(id) {
   if (running.has(id)) return;
   const data = getCampaign(id);
   if (!data || data.campaign.status === 'done') return;
+  if (data.campaign.phone_number_id && !isConnectedPn(data.campaign.phone_number_id)) return;
   running.add(id);
   setCampaignStatus(id, 'running');
   try {
