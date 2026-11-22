@@ -203,11 +203,13 @@ CREATE TABLE conversations_new (
   pending_menu INTEGER,
   last_after_hours_at INTEGER,
   status TEXT NOT NULL DEFAULT 'open',
+  labels TEXT DEFAULT '',
+  archived INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (wa_id, phone_number_id)
 )`);
     db.prepare(`
-INSERT INTO conversations_new (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status)
-SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status FROM conversations`).run(defId);
+INSERT INTO conversations_new (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status, labels, archived)
+SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status, labels, archived FROM conversations`).run(defId);
     db.exec(`DROP TABLE conversations`);
     db.exec(`ALTER TABLE conversations_new RENAME TO conversations`);
     db.exec(`COMMIT`);
@@ -217,6 +219,9 @@ SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assig
   try { db.exec(`ROLLBACK`); } catch {}
   console.error('فشلت ترقية جدول المحادثات:', e.message);
 }
+// ضمان وجود العمودين بعد أي مسار ترقية
+try { db.exec(`ALTER TABLE conversations ADD COLUMN labels TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN archived INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN phone_number_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN retry_count INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN next_retry_at INTEGER`); } catch {}
