@@ -55,6 +55,7 @@ import {
   registerPhoneNumber,
   listPhoneNumbers,
   setPhoneNumberLabel, setPhoneNumberGreetings, getPhoneNumberGreeting,
+  addPendingPhoneNumber, isConnectedPn,
   deletePhoneNumber,
   defaultPhoneNumberId,
   usageSummary,
@@ -159,6 +160,20 @@ app.use('/api', (req, res, next) => {
 function requireAdmin(req, res, next) {
   if (req.agent?.role !== 'admin') return res.status(403).json({ error: 'صلاحية المدير مطلوبة' });
   next();
+}
+
+// قسم الموظف المرتبط به (null = مدير أو بدون ربط: صلاحية كاملة)
+function deptScope(req) {
+  return req.agent?.role === 'admin' ? null : (req.agent?.phone_number_id || null);
+}
+
+// منع الإرسال من قسم غير متصل
+function pnDisconnected(res, pn) {
+  if (pn && !isConnectedPn(pn)) {
+    res.status(400).json({ error: 'هذا القسم غير متصل بواتساب بعد — لا يمكن الإرسال منه' });
+    return true;
+  }
+  return false;
 }
 
 // قفل مؤقت بعد محاولات دخول فاشلة متكررة
@@ -468,7 +483,17 @@ app.get('/api/phone-numbers', (req, res) => {
   res.json({ phone_numbers: listPhoneNumbers(), default_id: defaultPhoneNumberId() });
 });
 
+app.post('/api/phone-numbers', requireAdmin, (req, res) => {
+  const label = String(req.body?.label ?? '').trim();
+  if (!label) return res.status(400).json({ error: 'اسم القسم مطلوب' });
+  const id = 'pn-' + Date.now();
+  addPendingPhoneNumber(id, label, req.body?.display_number ? String(req.body.display_number) : null);
+  res.json({ ok: true, phone_number_id: id, phone_numbers: listPhoneNumbers() });
+});
+
 app.post('/api/phone-numbers/:id/label', (req, res) => {
+  const scopeL = deptScope(req);
+  if (scopeL && req.params.id !== scopeL) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
   const label = String(req.body?.label ?? '').trim();
   if (!label) return res.status(400).json({ error: 'اسم القسم مطلوب' });
   if (!listPhoneNumbers().some((p) => p.phone_number_id === req.params.id)) return res.status(404).json({ error: 'الرقم غير موجود' });
@@ -477,6 +502,8 @@ app.post('/api/phone-numbers/:id/label', (req, res) => {
 });
 
 app.post('/api/phone-numbers/:id/messages', (req, res) => {
+  const scopeM = deptScope(req);
+  if (scopeM && req.params.id !== scopeM) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
   if (!listPhoneNumbers().some((p) => p.phone_number_id === req.params.id)) return res.status(404).json({ error: 'الرقم غير موجود' });
   const { welcome_message, after_hours_message } = req.body ?? {};
   setPhoneNumberGreetings(req.params.id, { welcome_message, after_hours_message });
@@ -613,6 +640,11 @@ app.post('/api/templates/test', wrap(async (req, res) => {
 // ---------- البوت ----------
 
 app.get('/api/bot', (req, res) => {
+  const scopeB = deptScope(req);
+  if (scopeB) {
+    const rules = listBotRules().filter((r) => !r.phone_number_id || r.phone_number_id === scopeB);
+    return res.json({ enabled: Boolean(getBotSettings().enabled), rules });
+  }
   res.json({ enabled: Boolean(getBotSettings().enabled), rules: listBotRules() });
 });
 
@@ -637,7 +669,8 @@ app.post('/api/bot/rules', (req, res) => {
     }
   }
   const ruleType = type === 'menu' ? 'menu' : type === 'handoff' ? 'handoff' : 'keyword';
-  const id = addBotRule(keyword, response ?? '', ruleType, opts, phone_number_id || null);
+  const scopeR2 = deptScope(req);
+  const id = addBotRule(keyword, response ?? '', ruleType, opts, scopeR2 || phone_number_id || null);
   res.json({ ok: true, id });
 });
 
@@ -664,6 +697,11 @@ app.post('/api/bot/after-hours', (req, res) => {
 });
 
 app.delete('/api/bot/rules/:id', (req, res) => {
+  const scopeD = deptScope(req);
+  if (scopeD) {
+    const rule = getBotRule(Number(req.params.id));
+    if (!rule || rule.phone_number_id !== scopeD) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
+  }
   deleteBotRule(Number(req.params.id));
   res.json({ ok: true });
 });
@@ -695,7 +733,10 @@ app.post('/api/campaigns', (req, res) => {
   }
   const sched = scheduled_at ? Number(scheduled_at) : null;
   const bodyParams = Array.isArray(req.body?.body_params) ? req.body.body_params.map((v) => String(v)) : [];
-  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null, bodyParams, phoneNumberId: req.body?.phone_number_id ? String(req.body.phone_number_id) : null });
+  const scopeC = deptScope(req);
+  const campPn = scopeC || (req.body?.phone_number_id ? String(req.body.phone_number_id) : null);
+  if (pnDisconnected(res, campPn)) return;
+  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null, bodyParams, phoneNumberId: campPn });
   res.json({ ok: true, id, total: cleaned.length, scheduled: Boolean(sched) });
 });
 
@@ -765,6 +806,10 @@ async function runCampaign(id) {
 }
 
 app.post('/api/campaigns/:id/start', (req, res) => {
+  const scopeS = deptScope(req);
+  const campRow = getCampaign(Number(req.params.id));
+  if (scopeS && campRow?.campaign?.phone_number_id && campRow.campaign.phone_number_id !== scopeS) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
+  if (campRow?.campaign?.phone_number_id && pnDisconnected(res, campRow.campaign.phone_number_id)) return;
   const id = Number(req.params.id);
   const data = getCampaign(id);
   if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
@@ -864,6 +909,9 @@ app.post('/api/business-profile', wrap(async (req, res) => {
 // ---------- إرسال سريع (قالب معتمد لقائمة أرقام قصيرة بدون حملة) ----------
 
 app.post('/api/quick-send', wrap(async (req, res) => {
+  const scopeQ = deptScope(req);
+  if (scopeQ && req.body?.phone_number_id && String(req.body.phone_number_id) !== scopeQ) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
+  if (pnDisconnected(res, scopeQ || (req.body?.phone_number_id ? String(req.body.phone_number_id) : null))) return;
   const { template_name, language_code, header_link, header_type, phone_number_id } = req.body ?? {};
   const numbers = [...new Set(
     String(req.body?.numbers ?? '')
