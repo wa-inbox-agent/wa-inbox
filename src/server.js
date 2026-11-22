@@ -688,7 +688,7 @@ app.post('/api/campaigns', (req, res) => {
   }
   const sched = scheduled_at ? Number(scheduled_at) : null;
   const bodyParams = Array.isArray(req.body?.body_params) ? req.body.body_params.map((v) => String(v)) : [];
-  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null, bodyParams });
+  const id = createCampaign({ name: name.trim(), templateName: template_name, languageCode: language_code, numbers: cleaned, scheduledAt: sched, headerLink: header_link || null, headerType: header_link ? (header_type || 'image') : null, bodyParams, phoneNumberId: req.body?.phone_number_id ? String(req.body.phone_number_id) : null });
   res.json({ ok: true, id, total: cleaned.length, scheduled: Boolean(sched) });
 });
 
@@ -733,7 +733,7 @@ async function runCampaign(id) {
         const header = data.campaign.header_link ? { link: data.campaign.header_link, type: data.campaign.header_type ?? 'image' } : null;
         let bodyParams = [];
         try { bodyParams = JSON.parse(data.campaign.body_params ?? '[]'); } catch {}
-        const result = await sendTemplateEx(r.wa_id, data.campaign.template_name, data.campaign.language_code, header, bodyParams);
+        const result = await sendTemplateEx(r.wa_id, data.campaign.template_name, data.campaign.language_code, header, bodyParams, data.campaign.phone_number_id || null);
         markRecipient(r.id, { status: 'sent', waMessageId: result?.messages?.[0]?.id ?? null });
       } catch (err) {
         failures += 1;
