@@ -120,25 +120,56 @@ const AUTH_SECRET = process.env.AUTH_SECRET || randomBytes(32).toString('hex');
 
 // ---------- ترخيص النسخة المدفوعة ----------
 
-const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+const LICENSE_PUBLIC_KEY = process.env.LICENSE_PUBLIC_KEY || `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEATXKZjWQNCc84jHGRdR2uOYBw1pBPgkkihq7tHwzW7jE=
 -----END PUBLIC KEY-----`;
 
 if (!getSetting('instance_id')) setSetting('instance_id', randomBytes(4).toString('hex'));
 const instanceId = () => getSetting('instance_id');
-const licenseActivated = () => Boolean(getSetting('license_key'));
 
+// يقبل صيغتين: nameB64.sigB64 (دائم، الأكواد القديمة) أو nameB64.YYYY-MM-DD.sigB64 (سنوي بتاريخ انتهاء)
 function verifyLicenseKey(keyStr) {
   try {
-    const [b64name, b64sig] = String(keyStr).trim().split('.');
+    const parts = String(keyStr).trim().split('.');
+    if (parts.length !== 2 && parts.length !== 3) return null;
+    const b64name = parts[0];
+    let validUntil = null;
+    let b64sig = parts[1];
+    if (parts.length === 3) {
+      validUntil = parts[1];
+      b64sig = parts[2];
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(validUntil) || Number.isNaN(Date.parse(validUntil + 'T00:00:00Z'))) return null;
+    }
     const name = Buffer.from(b64name, 'base64url').toString('utf8');
     if (!name || name.length > 80 || !b64sig) return null;
-    const msg = `wa-inbox-license|${instanceId()}|${name}`;
+    const msg = validUntil
+      ? `wa-inbox-license|${instanceId()}|${name}|${validUntil}`
+      : `wa-inbox-license|${instanceId()}|${name}`;
     const ok = cryptoVerify(null, Buffer.from(msg), LICENSE_PUBLIC_KEY, Buffer.from(b64sig, 'base64url'));
-    return ok ? name : null;
+    return ok ? { name, validUntil } : null;
   } catch {
     return null;
   }
+}
+
+// حالة الترخيص: licensed (كود موقّع صحيح)، expired (انتهت صلاحيته)، warn (يتبقى 30 يومًا أو أقل)
+function licenseInfo() {
+  const empty = { licensed: false, expired: false, warn: false, expires_on: null, days_left: null };
+  const key = getSetting('license_key');
+  if (!key) return empty;
+  const parsed = verifyLicenseKey(key);
+  if (!parsed) return empty;
+  if (!parsed.validUntil) return { ...empty, licensed: true };
+  const daysLeft = Math.floor((Date.parse(parsed.validUntil + 'T23:59:59Z') - Date.now()) / 86400000) + 1;
+  const expired = daysLeft <= 0;
+  return { licensed: true, expired, warn: !expired && daysLeft <= 30, expires_on: parsed.validUntil, days_left: Math.max(daysLeft, 0) };
+}
+const licenseActivated = () => licenseInfo().licensed; // كود صحيح موجود (حتى لو منتهي): المنصة تفتح للقراءة، والإرسال يُقفل وحده
+const licenseCanSend = () => { const i = licenseInfo(); return i.licensed && !i.expired; };
+const LICENSE_EXPIRED_MSG = 'انتهت صلاحية الترخيص. الإرسال متوقف. جدّد الاشتراك من البائع (القراءة والتصدير يعملان).';
+function requireLicenseActive(req, res, next) {
+  if (!licenseCanSend()) return res.status(403).json({ error: LICENSE_EXPIRED_MSG, license_expired: true });
+  next();
 }
 const COOKIE = 'wa_session';
 
@@ -227,21 +258,28 @@ app.post('/api/auth/login', (req, res) => {
 // ---------- الإعداد الأولي للنسخة الجديدة (الإعداد الذاتي للمشتري) ----------
 
 app.get('/api/license/status', (req, res) => {
+  const i = licenseInfo();
   res.json({
-    activated: licenseActivated(),
+    activated: i.licensed,
+    licensed: i.licensed,
+    expired: i.expired,
+    warn: i.warn,
+    expires_on: i.expires_on,
+    days_left: i.days_left,
     instance_id: instanceId(),
     licensee: getSetting('licensee_name') || '',
   });
 });
 
+// التفعيل الأول أو التجديد: أي كود موقّع صحيح يُقبل ويحدّث الحالة (التحقق بالتوقيع هو الإثبات)
 app.post('/api/license/activate', (req, res) => {
-  if (licenseActivated()) return res.status(409).json({ error: 'المنصة مفعّلة بالفعل' });
-  const name = verifyLicenseKey(req.body?.key ?? '');
-  if (!name) return res.status(400).json({ error: 'كود التفعيل غير صحيح. تأكد من نسخه كاملًا أو راجع البائع.' });
+  const parsed = verifyLicenseKey(req.body?.key ?? '');
+  if (!parsed) return res.status(400).json({ error: 'كود التفعيل غير صحيح. تأكد من نسخه كاملًا أو راجع البائع.' });
+  const renewed = licenseActivated();
   setSetting('license_key', String(req.body.key).trim());
-  setSetting('licensee_name', name);
+  setSetting('licensee_name', parsed.name);
   setSetting('license_activated_at', new Date().toISOString());
-  res.json({ ok: true, licensee: name });
+  res.json({ ok: true, licensee: parsed.name, renewed, expires_on: parsed.validUntil });
 });
 
 app.get('/api/setup/status', (req, res) => {
@@ -389,6 +427,7 @@ function isAfterHours() {
 }
 
 async function sendBotText(waId, body, phoneNumberId = null) {
+  if (!licenseCanSend()) return;
   try {
     const result = await sendText(waId, body, phoneNumberId);
     insertOutbound({ waId, phoneNumberId, waMessageId: result?.messages?.[0]?.id, body, bot: 1 });
@@ -430,6 +469,7 @@ async function sendBotMenu(waId, rule, phoneNumberId = null) {
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
 async function maybeBotReply(msg, phoneNumberId = null) {
   if (msg.type !== 'text' && msg.type !== 'interactive') return;
+  if (!licenseCanSend()) return;
   // رد على تقييم العميل (CSAT) قبل أي منطق بوت
   const csatSelId = msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null;
   const csatMatch = /^csat_([1-5])$/.exec(String(csatSelId ?? ''));
@@ -622,7 +662,7 @@ app.get('/api/conversations/:waId/messages', (req, res) => {
 });
 
 // رفع ميديا من الجهاز إلى ميتا — يرجع media id يُرسل به في الرد
-app.post('/api/upload', express.raw({ type: () => true, limit: '16mb' }), wrap(async (req, res) => {
+app.post('/api/upload', requireLicenseActive, express.raw({ type: () => true, limit: '16mb' }), wrap(async (req, res) => {
   const mime = String(req.query.mime || 'application/octet-stream');
   const filename = String(req.query.filename || 'file');
   const pn = req.query.pn ? String(req.query.pn) : null;
@@ -631,7 +671,7 @@ app.post('/api/upload', express.raw({ type: () => true, limit: '16mb' }), wrap(a
   res.json({ ok: true, media_id: mediaId, mime });
 }));
 
-app.post('/api/conversations/:waId/reply', wrap(async (req, res) => {
+app.post('/api/conversations/:waId/reply', requireLicenseActive, wrap(async (req, res) => {
   const waId = req.params.waId;
   const body = String(req.body?.body ?? '').trim();
   const mediaUrl = String(req.body?.media_url ?? '').trim();
@@ -725,7 +765,7 @@ app.delete('/api/templates/:name', wrap(async (req, res) => {
 }));
 
 // إرسال قالب تجريبي لرقم واحد (للمعاينة قبل الحملات)
-app.post('/api/templates/test', wrap(async (req, res) => {
+app.post('/api/templates/test', requireLicenseActive, wrap(async (req, res) => {
   const { to, template_name, language_code, header_link, header_type, body_params } = req.body ?? {};
   const target = String(to ?? '').replace(/[^\d]/g, '');
   if (target.length < 8) return res.status(400).json({ error: 'الرقم غير صحيح' });
@@ -807,7 +847,7 @@ app.get('/api/campaigns/:id', (req, res) => {
   res.json(data);
 });
 
-app.post('/api/campaigns', (req, res) => {
+app.post('/api/campaigns', requireLicenseActive, (req, res) => {
   const { name, template_name, language_code, numbers, tag, scheduled_at, header_link, header_type } = req.body ?? {};
   let cleaned = [...new Set(
     String(numbers ?? '')
@@ -850,6 +890,7 @@ app.get('/api/numbers/quality', async (req, res) => {
 });
 
 async function runCampaign(id) {
+  if (!licenseCanSend()) return;
   if (running.has(id)) return;
   const data = getCampaign(id);
   if (!data || data.campaign.status === 'done') return;
@@ -891,7 +932,7 @@ async function runCampaign(id) {
   }
 }
 
-app.post('/api/campaigns/:id/start', (req, res) => {
+app.post('/api/campaigns/:id/start', requireLicenseActive, (req, res) => {
   const id = Number(req.params.id);
   const data = getCampaign(id);
   if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
@@ -909,6 +950,7 @@ setInterval(() => {
 // إعادة محاولة إرسال الرسائل الفاشلة تلقائيًا (3 محاولات: دقيقة، 5 دقائق، 15 دقيقة)
 const RETRY_DELAYS = [60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
 setInterval(async () => {
+  if (!licenseCanSend()) return;
   let failed;
   try { failed = failedForRetry(); } catch { return; }
   for (const msg of failed) {
@@ -990,7 +1032,7 @@ app.post('/api/business-profile', wrap(async (req, res) => {
 
 // ---------- إرسال سريع (قالب معتمد لقائمة أرقام قصيرة بدون حملة) ----------
 
-app.post('/api/quick-send', wrap(async (req, res) => {
+app.post('/api/quick-send', requireLicenseActive, wrap(async (req, res) => {
   const { template_name, language_code, header_link, header_type, phone_number_id } = req.body ?? {};
   const numbers = [...new Set(
     String(req.body?.numbers ?? '')
@@ -1057,7 +1099,7 @@ app.get('/api/export/campaigns/:id.csv', (req, res) => {
 
 const hashKey = (k) => createHash('sha256').update(String(k)).digest('hex');
 
-app.post('/api/outbound/send', wrap(async (req, res) => {
+app.post('/api/outbound/send', requireLicenseActive, wrap(async (req, res) => {
   const key = req.headers['x-api-key'];
   if (!key || !touchApiKey(hashKey(key))) return res.status(401).json({ error: 'مفتاح API غير صالح' });
 
@@ -1233,7 +1275,7 @@ app.get('/api/contacts-export', (req, res) => {
 });
 
 // إعادة محاولة الأرقام الفاشلة في حملة
-app.post('/api/campaigns/:id/retry-failed', (req, res) => {
+app.post('/api/campaigns/:id/retry-failed', requireLicenseActive, (req, res) => {
   const id = Number(req.params.id);
   const data = getCampaign(id);
   if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
