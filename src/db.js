@@ -644,6 +644,11 @@ export function deleteBotRule(id) {
   db.prepare(`DELETE FROM bot_rules WHERE id = ?`).run(id);
 }
 
+export function deleteCampaign(id) {
+  db.prepare(`DELETE FROM campaign_recipients WHERE campaign_id = ?`).run(id);
+  db.prepare(`DELETE FROM campaigns WHERE id = ?`).run(id);
+}
+
 // إيجاد أول قاعدة تطابق نص الرسالة؛ قواعد القسم أولًا ثم العامة. * تطابق أي رسالة
 export function matchBotRule(text, phoneNumberId = null) {
   const lower = String(text ?? '').toLowerCase();
