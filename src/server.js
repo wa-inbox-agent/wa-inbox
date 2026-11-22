@@ -13,6 +13,7 @@ import {
   addBotRule,
   deleteBotRule,
   deleteCampaign,
+  connectPhoneNumber,
   matchBotRule,
   getConversationBot,
   setConversationBot, setConversationLabels,
@@ -490,6 +491,18 @@ app.post('/api/phone-numbers', requireAdmin, (req, res) => {
   const id = 'pn-' + Date.now();
   addPendingPhoneNumber(id, label, req.body?.display_number ? String(req.body.display_number) : null);
   res.json({ ok: true, phone_number_id: id, phone_numbers: listPhoneNumbers() });
+});
+
+// ربط قسم غير متصل برقم واتساب مسجّل في ميتا (نفس الـ WABA) — للمدير فقط
+app.post('/api/phone-numbers/:id/connect', requireAdmin, (req, res) => {
+  const realId = String(req.body?.phone_number_id ?? '').replace(/[^\d]/g, '');
+  if (!realId || realId.length < 8) return res.status(400).json({ error: 'معرّف الرقم من ميتا (phone_number_id) مطلوب' });
+  const row = listPhoneNumbers().find((p) => p.phone_number_id === req.params.id);
+  if (!row) return res.status(404).json({ error: 'القسم غير موجود' });
+  if (row.connected) return res.status(400).json({ error: 'هذا القسم متصل بالفعل' });
+  if (listPhoneNumbers().some((p) => p.phone_number_id === realId)) return res.status(409).json({ error: 'هذا الرقم مربوط بقسم آخر' });
+  connectPhoneNumber(req.params.id, realId, req.body?.display_number ? String(req.body.display_number) : null);
+  res.json({ ok: true, phone_numbers: listPhoneNumbers() });
 });
 
 app.post('/api/phone-numbers/:id/label', (req, res) => {
