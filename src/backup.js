@@ -23,6 +23,7 @@ async function gh(method, p, body) {
       'User-Agent': 'wa-inbox-backup',
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(30000),
   });
   if (res.status === 404) return null;
   const data = await res.json().catch(() => ({}));
