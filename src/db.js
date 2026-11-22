@@ -139,6 +139,7 @@ try { db.exec(`ALTER TABLE conversations ADD COLUMN last_after_hours_at INTEGER`
 try { db.exec(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT 'open'`); } catch {}
 try { db.exec(`ALTER TABLE contacts ADD COLUMN notes TEXT`); } catch {}
 try { db.exec(`ALTER TABLE campaigns ADD COLUMN body_params TEXT`); } catch {}
+try { db.exec(`ALTER TABLE campaigns ADD COLUMN phone_number_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE bot_rules ADD COLUMN phone_number_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN quoted_wa_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE conversations ADD COLUMN labels TEXT DEFAULT ''`); } catch {}
@@ -203,11 +204,13 @@ CREATE TABLE conversations_new (
   pending_menu INTEGER,
   last_after_hours_at INTEGER,
   status TEXT NOT NULL DEFAULT 'open',
+  labels TEXT DEFAULT '',
+  archived INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (wa_id, phone_number_id)
 )`);
     db.prepare(`
-INSERT INTO conversations_new (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status)
-SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status FROM conversations`).run(defId);
+INSERT INTO conversations_new (wa_id, phone_number_id, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status, labels, archived)
+SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assigned_to, pending_menu, last_after_hours_at, status, labels, archived FROM conversations`).run(defId);
     db.exec(`DROP TABLE conversations`);
     db.exec(`ALTER TABLE conversations_new RENAME TO conversations`);
     db.exec(`COMMIT`);
@@ -217,6 +220,9 @@ SELECT wa_id, ?, name, last_message, last_message_at, unread, bot_enabled, assig
   try { db.exec(`ROLLBACK`); } catch {}
   console.error('فشلت ترقية جدول المحادثات:', e.message);
 }
+// ضمان وجود العمودين بعد أي مسار ترقية
+try { db.exec(`ALTER TABLE conversations ADD COLUMN labels TEXT DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE conversations ADD COLUMN archived INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN phone_number_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN retry_count INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE messages ADD COLUMN next_retry_at INTEGER`); } catch {}
@@ -642,12 +648,12 @@ export function setConversationBot(waId, enabled, phoneNumberId = null) {
 
 // ---------- الحملات ----------
 
-export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null, headerLink = null, headerType = null, bodyParams = [] }) {
+export function createCampaign({ name, templateName, languageCode, numbers, scheduledAt = null, headerLink = null, headerType = null, bodyParams = [], phoneNumberId = null }) {
   const t = now();
   const status = scheduledAt ? 'scheduled' : 'draft';
   const r = db
-    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, header_link, header_type, body_params, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, headerLink, headerType, JSON.stringify(bodyParams ?? []), t);
+    .prepare(`INSERT INTO campaigns (name, template_name, language_code, status, scheduled_at, header_link, header_type, body_params, phone_number_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(name, templateName, languageCode ?? 'ar', status, scheduledAt, headerLink, headerType, JSON.stringify(bodyParams ?? []), phoneNumberId, t);
   const id = Number(r.lastInsertRowid);
   const ins = db.prepare(`INSERT INTO campaign_recipients (campaign_id, wa_id) VALUES (?, ?)`);
   for (const n of numbers) ins.run(id, n);
