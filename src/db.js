@@ -5,7 +5,7 @@ import path from 'node:path';
 const dataDir = path.join(process.cwd(), 'data');
 mkdirSync(dataDir, { recursive: true });
 
-const db = new DatabaseSync(path.join(dataDir, 'wa-inbox.db'));
+export const db = new DatabaseSync(path.join(dataDir, 'wa-inbox.db'));
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS conversations (
@@ -285,6 +285,15 @@ export function connectPhoneNumber(pendingId, realPhoneNumberId, displayNumber =
     db.prepare(`UPDATE agents SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
     db.prepare(`UPDATE conversations SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
     db.prepare(`UPDATE messages SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    for (const table of ['department_contacts','department_notes','department_canned','department_templates','department_media','api_key_departments','history_import_batches','history_import_records']) {
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table))
+        db.prepare(`UPDATE ${table} SET phone_number_id = ? WHERE phone_number_id = ?`).run(rid, pid);
+    }
+    const prefix = `department:${pid}:`;
+    for (const row of db.prepare('SELECT key,value FROM settings WHERE substr(key,1,?)=?').all(prefix.length,prefix)) {
+      setSetting(`department:${rid}:` + row.key.slice(prefix.length),row.value);
+      db.prepare('DELETE FROM settings WHERE key=?').run(row.key);
+    }
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -384,12 +393,13 @@ export function insertOutbound({ waId, phoneNumberId = null, waMessageId, body, 
   ).run(waId, pn, body ?? `[${type}]`, t);
 }
 
-export function updateStatus(waMessageId, status) {
-  db.prepare(`UPDATE messages SET status = ? WHERE wa_message_id = ?`).run(status, waMessageId);
+export function updateStatus(waMessageId, status, phoneNumberId = null) {
+  const pn=phoneNumberId??defaultPhoneNumberId();
+  db.prepare(`UPDATE messages SET status = ? WHERE wa_message_id = ? AND phone_number_id = ?`).run(status, waMessageId, pn);
   // تحديث مستلمي الحملات المرتبطين بنفس الرسالة
   db.prepare(
-    `UPDATE campaign_recipients SET status = ?, updated_at = ? WHERE wa_message_id = ?`
-  ).run(status, now(), waMessageId);
+    `UPDATE campaign_recipients SET status = ?, updated_at = ? WHERE wa_message_id = ? AND campaign_id IN (SELECT id FROM campaigns WHERE COALESCE(phone_number_id, ?) = ?)`
+  ).run(status, now(), waMessageId, defaultPhoneNumberId(), pn);
 }
 
 export function listConversations(agent = null, archivedOnly = false) {
@@ -402,7 +412,7 @@ export function listConversations(agent = null, archivedOnly = false) {
       // موظف مربوط بقسم: يرى محادثات قسمه فقط
       return db.prepare(`${select} WHERE c.phone_number_id = ? AND ${archWhere} ORDER BY c.last_message_at DESC`).all(agent.phone_number_id);
     }
-    return db.prepare(`${select} WHERE (c.assigned_to IS NULL OR c.assigned_to = ?) AND ${archWhere} ORDER BY c.last_message_at DESC`).all(agent.id);
+    return []; // Unassigned employees have no department authority.
   }
   return db.prepare(`${select} WHERE ${archWhere} ORDER BY c.last_message_at DESC`).all();
 }
@@ -643,6 +653,23 @@ export function setSetting(key, value) {
   db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, String(value));
 }
 
+// Legacy global defaults belong only to the original/default department.
+export function departmentSetting(phoneNumberId, key) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  const override = db.prepare('SELECT value FROM settings WHERE key = ?').get(`department:${pn}:${key}`);
+  if (override) return override.value;
+  if (pn === defaultPhoneNumberId()) return getSetting(key);
+  if (key.endsWith('_message')) return '';
+  return DEFAULTS[key] ?? null;
+}
+
+export function departmentBotEnabled(phoneNumberId) {
+  const pn = phoneNumberId ?? defaultPhoneNumberId();
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(`department:${pn}:bot_enabled`);
+  if (row) return row.value === '1';
+  return pn === defaultPhoneNumberId() ? Boolean(getBotSettings().enabled) : true;
+}
+
 export function allSettings() {
   const out = { ...DEFAULTS };
   for (const r of db.prepare(`SELECT key, value FROM settings`).all()) out[r.key] = r.value;
@@ -673,7 +700,7 @@ export function matchBotRule(text, phoneNumberId = null) {
   const lower = String(text ?? '').toLowerCase();
   const rules = listBotRules();
   const scoped = rules.filter((r) => r.phone_number_id && r.phone_number_id === phoneNumberId);
-  const global = rules.filter((r) => !r.phone_number_id);
+  const global = (phoneNumberId ?? defaultPhoneNumberId()) === defaultPhoneNumberId() ? rules.filter((r) => !r.phone_number_id) : [];
   for (const rule of [...scoped, ...global]) {
     if (rule.keyword === '*') return rule;
     if (lower.includes(rule.keyword.toLowerCase())) return rule;
@@ -781,8 +808,10 @@ export function deleteContact(phone) {
   db.prepare(`DELETE FROM contacts WHERE phone = ?`).run(phone);
 }
 
-export function isOptedOut(phone) {
-  return Boolean(db.prepare(`SELECT opted_out FROM contacts WHERE phone = ?`).get(phone)?.opted_out);
+export function isOptedOut(phone, phoneNumberId = null) {
+  const global = Boolean(db.prepare(`SELECT opted_out FROM contacts WHERE phone = ?`).get(phone)?.opted_out);
+  if (global || !phoneNumberId) return global;
+  return Boolean(db.prepare(`SELECT opted_out FROM department_contacts WHERE phone = ? AND phone_number_id = ?`).get(phone, phoneNumberId)?.opted_out);
 }
 
 // أرقام قسم معيّن (تاج) من المشتركين فقط
@@ -805,6 +834,7 @@ export function listApiKeys() {
 }
 
 export function deleteApiKey(id) {
+  db.prepare('DELETE FROM api_key_departments WHERE key_id=?').run(id);
   db.prepare(`DELETE FROM api_keys WHERE id = ?`).run(id);
 }
 
@@ -954,3 +984,23 @@ export function logWebhookEvent(kind, summary) {
 export function recentWebhookEvents() {
   return db.prepare(`SELECT * FROM webhook_events ORDER BY id DESC LIMIT 10`).all();
 }
+
+// Additive privacy storage. Original legacy records are not copied or altered.
+db.exec(`
+    CREATE TABLE IF NOT EXISTS department_contacts (
+      phone_number_id TEXT NOT NULL, phone TEXT NOT NULL, name TEXT, tags TEXT NOT NULL DEFAULT '',
+      opted_out INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at INTEGER NOT NULL,
+      PRIMARY KEY(phone_number_id,phone));
+    CREATE TABLE IF NOT EXISTS department_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number_id TEXT NOT NULL, wa_id TEXT NOT NULL,
+      agent_name TEXT, body TEXT NOT NULL, created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS department_canned (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, phone_number_id TEXT NOT NULL,
+      title TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS department_templates (
+      phone_number_id TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(phone_number_id,name));
+    CREATE TABLE IF NOT EXISTS department_media (
+      phone_number_id TEXT NOT NULL, media_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+      PRIMARY KEY(phone_number_id,media_id));
+    CREATE TABLE IF NOT EXISTS api_key_departments (key_id INTEGER PRIMARY KEY, phone_number_id TEXT NOT NULL);
+  `);

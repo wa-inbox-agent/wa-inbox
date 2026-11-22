@@ -1,3 +1,5 @@
+import {metaWebhookGuard,webhookSecurityStatus} from './webhook-security.js';
+import {createDepartmentPrivacy} from './department-privacy.js';
 import {createDataTransfer} from './data-transfer.js';
 import express from 'express';
 import path from 'node:path';
@@ -8,7 +10,7 @@ import {
   updateStatus,
   listConversations,
   listMessages,
-  getBotSettings,
+  getBotSettings, departmentBotEnabled, departmentSetting, db,
   setBotEnabled,
   listBotRules,
   addBotRule,
@@ -90,7 +92,8 @@ import { scryptSync, randomBytes, createHash, createHmac, timingSafeEqual } from
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '2mb', inflate:false, verify:(req,res,raw)=>{if(req.path==='/webhook')req.rawBody=Buffer.from(raw);} }));
+app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');res.vary('Cookie');res.vary('X-API-Key');next();});
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
@@ -153,7 +156,7 @@ function readSession(req) {
 // ملاحظة: داخل app.use('/api') يكون req.path بدون البادئة /api
 const PUBLIC_API = new Set(['/health', '/auth/login']);
 app.use('/api', (req, res, next) => {
-  if (PUBLIC_API.has(req.path) || req.path.startsWith('/outbound')) return next();
+  if (PUBLIC_API.has(req.path) || req.path === '/outbound/send') return next();
   const agent = readSession(req);
   if (!agent) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
   req.agent = agent;
@@ -165,11 +168,12 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// قسم الموظف المرتبط به (null = مدير أو بدون ربط: صلاحية كاملة)
+// Null is owner-wide only. Unassigned employees are rejected by the boundary.
 function deptScope(req) {
   return req.agent?.role === 'admin' ? null : (req.agent?.phone_number_id || null);
 }
 
+createDepartmentPrivacy({app});
 createDataTransfer({app,requireAdmin,listPhoneNumbers});
 
 // منع الإرسال من قسم غير متصل
@@ -264,15 +268,15 @@ if (agentsCount() === 0 && process.env.ADMIN_USER && process.env.ADMIN_PASSWORD)
 }
 
 // هل نحن الآن خارج ساعات العمل؟ (بتوقيت الرياض)
-function isAfterHours() {
-  if (getSetting('after_hours_enabled') !== '1') return false;
+function isAfterHours(phoneNumberId = null) {
+  if (departmentSetting(phoneNumberId, 'after_hours_enabled') !== '1') return false;
   const nowRiyadh = new Date(Date.now() + 3 * 3600 * 1000); // UTC+3
   const day = nowRiyadh.getUTCDay();
-  const days = String(getSetting('work_days')).split(',').map((d) => Number(d.trim()));
+  const days = String(departmentSetting(phoneNumberId, 'work_days')).split(',').map((d) => Number(d.trim()));
   if (!days.includes(day)) return true;
   const hm = nowRiyadh.getUTCHours() * 60 + nowRiyadh.getUTCMinutes();
-  const [sh, sm] = String(getSetting('work_start')).split(':').map(Number);
-  const [eh, em] = String(getSetting('work_end')).split(':').map(Number);
+  const [sh, sm] = String(departmentSetting(phoneNumberId, 'work_start')).split(':').map(Number);
+  const [eh, em] = String(departmentSetting(phoneNumberId, 'work_end')).split(':').map(Number);
   return hm < sh * 60 + sm || hm >= eh * 60 + em;
 }
 
@@ -329,15 +333,15 @@ async function maybeBotReply(msg, phoneNumberId = null) {
     } catch {}
     return;
   }
-  if (!getBotSettings().enabled) return;
+  if (!departmentBotEnabled(phoneNumberId)) return;
   if (!getConversationBot(msg.from, phoneNumberId)) return;
   const text = msg.text?.body ?? msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? '';
   const selId = msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null;
 
   // خارج الدوام: رد واحد كل 12 ساعة لكل محادثة ويتجاوز باقي القواعد
-  if (isAfterHours()) {
+  if (isAfterHours(phoneNumberId)) {
     if (Date.now() - getLastAfterHours(msg.from, phoneNumberId) > 12 * 3600 * 1000) {
-      await sendBotText(msg.from, getPhoneNumberGreeting(phoneNumberId, 'after_hours_message') || getSetting('after_hours_message'), phoneNumberId);
+      await sendBotText(msg.from, getPhoneNumberGreeting(phoneNumberId, 'after_hours_message') || departmentSetting(phoneNumberId, 'after_hours_message'), phoneNumberId);
       setLastAfterHours(msg.from, Date.now(), phoneNumberId);
     }
     return;
@@ -346,7 +350,8 @@ async function maybeBotReply(msg, phoneNumberId = null) {
   // قائمة معلّقة: الاختيار بضغطة زر/صف (id) أو برقم الخيار أو بنصه
   const pendingId = getPendingMenu(msg.from, phoneNumberId);
   if (pendingId) {
-    const rule = getBotRule(pendingId);
+    const candidateRule = getBotRule(pendingId);
+    const rule = candidateRule && (candidateRule.phone_number_id === phoneNumberId || (!candidateRule.phone_number_id && phoneNumberId === defaultPhoneNumberId())) ? candidateRule : null;
     const opts = rule ? (typeof rule.options === 'string' ? JSON.parse(rule.options) : rule.options ?? []) : [];
     const opt = opts.find((o) => (selId && selId === `r${rule.id}_o${o.key}`) || o.key === text.trim() || o.label === text.trim());
     if (opt) {
@@ -386,7 +391,7 @@ app.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-app.post('/webhook', (req, res) => {
+app.post('/webhook', metaWebhookGuard, (req, res) => {
   res.sendStatus(200);
   try {
     const keys = Object.keys(req.body ?? {});
@@ -397,15 +402,20 @@ app.post('/webhook', (req, res) => {
 
   (async () => {
     try {
+      if(req.body?.object!=='whatsapp_business_account')return;
       const entries = req.body?.entry ?? [];
       for (const entry of entries) {
+        if(String(entry.id??'')!==String(process.env.WABA_ID??''))continue;
         for (const change of entry.changes ?? []) {
           const value = change.value;
           const phoneNumberId = value?.metadata?.phone_number_id ? String(value.metadata.phone_number_id) : null;
-          if (phoneNumberId) registerPhoneNumber(phoneNumberId, value?.metadata?.display_phone_number ?? null);
+          // Number enrollment is an admin action verified against the configured WABA, never a webhook assertion.
+          if(!phoneNumberId || !/^\d{8,25}$/.test(phoneNumberId) || !listPhoneNumbers().some(p=>p.phone_number_id===phoneNumberId&&p.connected))continue;
           if (value?.messages) {
             const contacts = value.contacts ?? [];
             for (const msg of value.messages) {
+              if(!/^\d{8,20}$/.test(String(msg.from??''))||typeof msg.id!=='string')continue;
+              if(db.prepare('SELECT 1 FROM messages WHERE phone_number_id=? AND wa_message_id=?').get(phoneNumberId,msg.id))continue;
               const contact = contacts.find((c) => c.wa_id === msg.from);
               const isNewConversation = !conversationExists(msg.from, phoneNumberId);
               logWebhookEvent('message', `رسالة ${msg.type} من ${msg.from}`);
@@ -433,14 +443,15 @@ app.post('/webhook', (req, res) => {
                 setContactOptOut(msg.from, true);
               }
               // رسالة ترحيب تلقائية لأول محادثة (عند تفعيلها من إعدادات البوت)
-              if (isNewConversation && getSetting('welcome_enabled') === '1' && getBotSettings().enabled && getConversationBot(msg.from)) {
-                await sendBotText(msg.from, getPhoneNumberGreeting(phoneNumberId, 'welcome_message') || getSetting('welcome_message'), phoneNumberId);
+              if (isNewConversation && departmentSetting(phoneNumberId, 'welcome_enabled') === '1' && departmentBotEnabled(phoneNumberId) && getConversationBot(msg.from, phoneNumberId)) {
+                await sendBotText(msg.from, getPhoneNumberGreeting(phoneNumberId, 'welcome_message') || departmentSetting(phoneNumberId, 'welcome_message'), phoneNumberId);
               }
               await maybeBotReply(msg, phoneNumberId);
             }
           }
           for (const st of value?.statuses ?? []) {
-            updateStatus(st.id, st.status);
+            if(!['sent','delivered','read','failed','deleted'].includes(st.status))continue;
+            updateStatus(st.id, st.status, phoneNumberId);
             logWebhookEvent('status', `حالة ${st.status} للرسالة ${st.id}`);
           }
         }
@@ -477,6 +488,8 @@ app.get('/api/admin/backup', requireAdmin, (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="wa-inbox-backup-${stamp}.json"`);
   res.send(JSON.stringify(data, null, 2));
 });
+
+app.get('/api/admin/security-status', requireAdmin, (req,res)=>res.json(webhookSecurityStatus()));
 
 app.get('/api/admin/daily-summary', requireAdmin, (req, res) => {
   res.json(dailyAdminSummary());
@@ -766,7 +779,7 @@ app.post('/api/campaigns', (req, res) => {
       .filter((n) => n.length >= 8)
   )];
   if (tag?.trim()) cleaned = [...new Set([...cleaned, ...phonesForTag(tag)])];
-  cleaned = cleaned.filter((p) => !isOptedOut(p));
+  cleaned = cleaned.filter((p) => !isOptedOut(p, deptScope(req) || req.body?.phone_number_id || defaultPhoneNumberId()));
   if (!name?.trim() || !template_name || cleaned.length === 0) {
     return res.status(400).json({ error: 'اسم الحملة والقالب وقائمة الأرقام (أو قسم مشتركين) مطلوبة' });
   }
@@ -784,21 +797,23 @@ const running = new Set();
 const pace = () => new Promise((s) => setTimeout(s, 1200 + Math.floor(Math.random() * 1400)));
 
 // جودة أرقام واتساب من ميتا مع تخزين مؤقت 60 ثانية
-let qualityCache = { at: 0, data: [] };
+const qualityCache = new Map();
 app.get('/api/numbers/quality', async (req, res) => {
-  if (Date.now() - qualityCache.at > 60000) {
+  const scope = deptScope(req), key = scope || '__owner__';
+  let cached = qualityCache.get(key);
+  if (!cached || Date.now() - cached.at > 60000) {
     const out = [];
-    for (const p of listPhoneNumbers()) {
+    for (const p of listPhoneNumbers().filter(p => !scope || p.phone_number_id === scope)) {
       try {
         const q = await getNumberQuality(p.phone_number_id);
         out.push({ phone_number_id: p.phone_number_id, quality_rating: q.quality_rating ?? null, messaging_limit_tier: q.messaging_limit_tier ?? null, name_status: q.name_status ?? null });
-      } catch (e) {
-        out.push({ phone_number_id: p.phone_number_id, quality_rating: null, messaging_limit_tier: null, name_status: null, error: e.message });
+      } catch {
+        out.push({ phone_number_id: p.phone_number_id, quality_rating: null, messaging_limit_tier: null, name_status: null, error: 'تعذر قراءة جودة هذا الرقم' });
       }
     }
-    qualityCache = { at: Date.now(), data: out };
+    cached = { at: Date.now(), data: out };qualityCache.set(key,cached);
   }
-  res.json({ quality: qualityCache.data });
+  res.json({ quality: cached.data });
 });
 
 async function runCampaign(id) {
@@ -812,7 +827,7 @@ async function runCampaign(id) {
     let attempts = 0;
     let failures = 0;
     for (const r of pendingRecipients(id)) {
-      if (isOptedOut(r.wa_id)) {
+      if (isOptedOut(r.wa_id, data.campaign.phone_number_id || defaultPhoneNumberId())) {
         markRecipient(r.id, { status: 'skipped', error: 'ألغى الاشتراك' });
         continue;
       }
@@ -957,7 +972,7 @@ app.post('/api/quick-send', wrap(async (req, res) => {
       .split(/[\s,;]+/)
       .map((n) => n.replace(/[^\d]/g, ''))
       .filter((n) => n.length >= 8)
-  )].filter((p) => !isOptedOut(p)).slice(0, 100);
+  )].filter((p) => !isOptedOut(p, scopeQ || req.body?.phone_number_id || defaultPhoneNumberId())).slice(0, 100);
   if (!template_name || !numbers.length) return res.status(400).json({ error: 'القالب وقائمة الأرقام مطلوبة (حتى 100 رقم)' });
   const pn = phone_number_id || null;
   const header = header_link ? { link: header_link, type: header_type ?? 'image' } : null;
