@@ -12,6 +12,7 @@ import {
   listBotRules,
   addBotRule,
   deleteBotRule,
+  deleteCampaign,
   matchBotRule,
   getConversationBot,
   setConversationBot, setConversationLabels,
@@ -512,6 +513,8 @@ app.post('/api/phone-numbers/:id/messages', (req, res) => {
 
 // حذف رقم مسجّل (غير الافتراضي) — مفيد لو اتسجّل رقم بالغلط
 app.delete('/api/phone-numbers/:id', (req, res) => {
+  const scope = deptScope(req);
+  if (scope) return res.status(403).json({ error: 'حذف الأرقام للمدير فقط' });
   if (req.params.id === defaultPhoneNumberId()) return res.status(400).json({ error: 'لا يمكن حذف الرقم الافتراضي' });
   deletePhoneNumber(req.params.id);
   res.json({ ok: true, phone_numbers: listPhoneNumbers() });
@@ -709,12 +712,16 @@ app.delete('/api/bot/rules/:id', (req, res) => {
 // ---------- الحملات ----------
 
 app.get('/api/campaigns', (req, res) => {
-  res.json({ campaigns: listCampaigns() });
+  const scope = deptScope(req);
+  const all = listCampaigns();
+  res.json({ campaigns: scope ? all.filter((c) => c.phone_number_id === scope) : all });
 });
 
 app.get('/api/campaigns/:id', (req, res) => {
   const data = getCampaign(Number(req.params.id));
   if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
+  const scope = deptScope(req);
+  if (scope && data.campaign.phone_number_id && data.campaign.phone_number_id !== scope) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
   res.json(data);
 });
 
@@ -1153,11 +1160,26 @@ app.get('/api/contacts-export', (req, res) => {
   res.send(csv);
 });
 
+// حذف حملة (مسودة أو مكتملة) — المدير أو قسم الحملة فقط
+app.delete('/api/campaigns/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const data = getCampaign(id);
+  if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
+  const scope = deptScope(req);
+  if (scope && data.campaign.phone_number_id && data.campaign.phone_number_id !== scope) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
+  if (running.has(id)) return res.status(409).json({ error: 'الحملة تعمل الآن — لا يمكن حذفها' });
+  deleteCampaign(id);
+  res.json({ ok: true });
+});
+
 // إعادة محاولة الأرقام الفاشلة في حملة
 app.post('/api/campaigns/:id/retry-failed', (req, res) => {
   const id = Number(req.params.id);
   const data = getCampaign(id);
   if (!data) return res.status(404).json({ error: 'الحملة غير موجودة' });
+  const scope = deptScope(req);
+  if (scope && data.campaign.phone_number_id && data.campaign.phone_number_id !== scope) return res.status(403).json({ error: 'صلاحية هذا القسم فقط' });
+  if (data.campaign.phone_number_id && pnDisconnected(res, data.campaign.phone_number_id)) return;
   const count = resetFailedRecipients(id);
   if (count === 0) return res.json({ ok: true, count: 0 });
   setCampaignStatus(id, 'draft');
