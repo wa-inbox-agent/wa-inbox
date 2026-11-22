@@ -54,7 +54,7 @@ import {
   setConversationStatus,
   registerPhoneNumber,
   listPhoneNumbers,
-  setPhoneNumberLabel,
+  setPhoneNumberLabel, setPhoneNumberGreetings, getPhoneNumberGreeting,
   deletePhoneNumber,
   defaultPhoneNumberId,
   usageSummary,
@@ -317,7 +317,7 @@ async function maybeBotReply(msg, phoneNumberId = null) {
   // خارج الدوام: رد واحد كل 12 ساعة لكل محادثة ويتجاوز باقي القواعد
   if (isAfterHours()) {
     if (Date.now() - getLastAfterHours(msg.from, phoneNumberId) > 12 * 3600 * 1000) {
-      await sendBotText(msg.from, getSetting('after_hours_message'), phoneNumberId);
+      await sendBotText(msg.from, getPhoneNumberGreeting(phoneNumberId, 'after_hours_message') || getSetting('after_hours_message'), phoneNumberId);
       setLastAfterHours(msg.from, Date.now(), phoneNumberId);
     }
     return;
@@ -414,7 +414,7 @@ app.post('/webhook', (req, res) => {
               }
               // رسالة ترحيب تلقائية لأول محادثة (عند تفعيلها من إعدادات البوت)
               if (isNewConversation && getSetting('welcome_enabled') === '1' && getBotSettings().enabled && getConversationBot(msg.from)) {
-                await sendBotText(msg.from, getSetting('welcome_message'), phoneNumberId);
+                await sendBotText(msg.from, getPhoneNumberGreeting(phoneNumberId, 'welcome_message') || getSetting('welcome_message'), phoneNumberId);
               }
               await maybeBotReply(msg, phoneNumberId);
             }
@@ -473,6 +473,13 @@ app.post('/api/phone-numbers/:id/label', (req, res) => {
   if (!label) return res.status(400).json({ error: 'اسم القسم مطلوب' });
   if (!listPhoneNumbers().some((p) => p.phone_number_id === req.params.id)) return res.status(404).json({ error: 'الرقم غير موجود' });
   setPhoneNumberLabel(req.params.id, label);
+  res.json({ ok: true, phone_numbers: listPhoneNumbers() });
+});
+
+app.post('/api/phone-numbers/:id/messages', (req, res) => {
+  if (!listPhoneNumbers().some((p) => p.phone_number_id === req.params.id)) return res.status(404).json({ error: 'الرقم غير موجود' });
+  const { welcome_message, after_hours_message } = req.body ?? {};
+  setPhoneNumberGreetings(req.params.id, { welcome_message, after_hours_message });
   res.json({ ok: true, phone_numbers: listPhoneNumbers() });
 });
 
