@@ -239,6 +239,10 @@
     body.chat-open #chatBackBtn { display: inline-block; }
     body.chat-open #composer textarea { font-size: 16px; }
   }
+.ec-page{max-width:1240px}.ec-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.ec-heading h3{margin-bottom:0}.ec-notice{padding:15px 18px;border:1px solid #e6d6ac;background:#fff9e9;border-radius:12px;margin:18px 0;line-height:1.8;color:#685224}.ec-pill{display:inline-block;background:#eef0fa;color:#39457c;border-radius:30px;padding:5px 11px;font-size:12px;white-space:nowrap}.ec-preview-pill{background:#e9eefb;color:#303f75}.ec-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.ec-stat{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:5px}.ec-stat strong{font-size:28px;color:var(--navy)}.ec-stat span{color:var(--muted);font-size:13px}.ec-store-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin-top:16px}.ec-store{border:1px solid var(--border);border-radius:10px;padding:16px;min-width:0}.ec-store-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.ec-status{color:#9a681a;font-weight:700;margin-top:12px}.ec-demo-label{font-size:11px;color:#786238;background:#fcf5e6;display:inline-block;padding:3px 7px;border-radius:5px;margin-top:5px}.ec-form-grid{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}.ec-form-grid>div{flex:1;min-width:170px}.ec-form-grid button{margin:0 0 2px}.ec-filters{display:flex;gap:8px;flex-wrap:wrap}.ec-filters select{width:auto;max-width:230px}.ec-table-wrap{overflow-x:auto;margin-top:14px}.ec-table-wrap th,.ec-table-wrap td{white-space:normal;min-width:100px;vertical-align:top}.ec-table-wrap td:first-child{min-width:170px}.ec-small{padding:6px 12px!important;font-size:12px!important;margin:2px!important}.ec-empty{padding:24px 10px;text-align:center;color:var(--muted);line-height:1.8}.ec-code{display:block;overflow-wrap:anywhere;white-space:normal;background:var(--field);padding:10px;border-radius:8px;font-size:11px}.ec-store details{margin-top:10px}.ec-store summary{font-size:12px;cursor:pointer;color:var(--navy)}.ec-message{white-space:pre-wrap;background:#eff7f3;border:1px solid #d9eadf;border-radius:12px;padding:18px;line-height:1.9;margin:15px 0;overflow-wrap:anywhere}.ec-blocks{padding-inline-start:22px;line-height:1.9;color:var(--muted);font-size:13px}.ec-check{display:flex;align-items:center;gap:10px;margin:14px 0}.ec-check input{width:auto}.ec-demo-buttons{display:flex;gap:8px;flex-wrap:wrap}.ec-error{background:#fff0f0;color:#a02525;border:1px solid #ecc6c6;border-radius:10px;padding:12px;margin:10px 0}.ec-demo{border-style:dashed!important}.ec-preview{border-color:#b8d5c3!important}@media(max-width:700px){.ec-stats{grid-template-columns:repeat(2,1fr)}.ec-form-grid>div{min-width:100%}.ec-heading{align-items:flex-start}.ec-filters select{max-width:100%}.ec-heading h2{font-size:23px}}
+
+
+nav .ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0} .brand .logo-tile .brand-initial{color:var(--navy);min-width:22px;min-height:22px} #notifBtn svg{display:block}
 </style>
 </head>
 <body>
@@ -300,24 +304,25 @@
     <div class="brand-sub" id="headBrandSub">منصة واتساب للأعمال</div>
   </div>
   <nav>
-    <button data-view="guide" id="guideNav"><span class="ico">🚀</span>دليل التشغيل</button>
-    <button data-view="dashboard" class="active"><span class="ico">📊</span>لوحة التحكم</button>
+    <button data-view="guide" id="guideNav"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V5a1 1 0 0 1 1-1Z"/><path d="M7 16h11M8 8h6M8 11h6"/></svg></span>دليل التشغيل</button>
+    <button data-view="dashboard" class="active"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>لوحة التحكم</button>
     <div class="nav-group">إدارة واتساب</div>
-    <button data-view="profile"><span class="ico">🏢</span>الملف التجاري</button>
-    <button data-view="templates"><span class="ico">📋</span>قوالب الرسائل</button>
-    <button data-view="quick"><span class="ico">⚡</span>إرسال سريع</button>
-    <button data-view="campaigns"><span class="ico">📣</span>الحملات</button>
-    <button data-view="blocked"><span class="ico">🚫</span>المحظورون</button>
-    <button data-view="usage"><span class="ico">📈</span>ملخص الاستهلاك</button>
+    <button data-view="profile"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5h16v16M8 21v-5h8v5M8 9h1m6 0h1M8 12h1m6 0h1M2 21h20"/></svg></span>الملف التجاري</button>
+    <button data-view="templates"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg></span>قوالب الرسائل</button>
+    <button data-view="quick"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m13 2-8 12h6l-1 8 9-13h-7l1-7Z"/></svg></span>إرسال سريع</button>
+    <button data-view="campaigns"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 15-6v16L3 14v-4ZM18 9h3v6h-3M7 16l2 6h3l-1-5"/></svg></span>الحملات</button>
+    <button data-view="blocked"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg></span>المحظورون</button>
+    <button data-view="usage"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M6 15l5-5 4 3 6-8"/></svg></span>ملخص الاستهلاك</button>
     <div class="nav-group">التواصل</div>
-    <button data-view="inbox"><span class="ico">💬</span>المحادثات المباشرة<span class="nav-badge" id="inboxNavBadge" hidden></span></button>
-    <button data-view="bot"><span class="ico">🤖</span>إدارة البوت</button>
-    <button data-view="contacts"><span class="ico">👥</span>جهات الاتصال</button>
-    <button data-view="agents" id="agentsNav" hidden><span class="ico">🧑‍💼</span>الموظفون</button>
+    <button data-view="inbox"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z"/><path d="M8 8h8M8 12h6"/></svg></span>المحادثات المباشرة<span class="nav-badge" id="inboxNavBadge" hidden></span></button>
+    <button data-view="bot"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M12 6V2M1 11v5m22-5v5M8 16h8"/><circle cx="8" cy="11" r="1"/><circle cx="16" cy="11" r="1"/></svg></span>إدارة البوت</button>
+    <button data-view="ecommerce" id="ecommerceNav" hidden><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h3l3 13h11l3-10H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span>التجارة الإلكترونية</button>
+    <button data-view="contacts"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 3a4 4 0 0 1 0 8m2 3a6 6 0 0 1 3 5v2"/></svg></span>جهات الاتصال</button>
+    <button data-view="agents" id="agentsNav" hidden><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3M8 20v-4m8 4v-4"/></svg></span>الموظفون</button>
     <div class="nav-group">النظام</div>
-    <button data-view="reports" id="reportsNav"><span class="ico">🛰️</span>سجل الاتصال</button>
-    <button data-view="api" id="apiNav" hidden><span class="ico">🔌</span>المطورون (API)</button>
-    <button data-view="help"><span class="ico">❓</span>المساعدة</button>
+    <button data-view="reports" id="reportsNav"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>سجل الاتصال</button>
+    <button data-view="api" id="apiNav" hidden><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5-6 7 6 7m8-14 6 7-6 7M14 3l-4 18"/></svg></span>المطورون (API)</button>
+    <button data-view="help"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 4 3c-1 .5-1 1-1 2M12 17h.01"/></svg></span>المساعدة</button>
   </nav>
   <div class="side-foot">
     <button id="langBtn" type="button">English</button>
@@ -974,6 +979,24 @@
   </div>
 </div>
 
+<div class="view" id="view-ecommerce">
+<div class="page ec-page">
+  <div class="ec-heading"><div><h2>التجارة الإلكترونية</h2><p class="hint">السلات والطلبات ورسائل المتابعة، في مكان واحد</p></div><span class="ec-pill ec-preview-pill">معاينة فقط · لا يوجد إرسال</span></div>
+  <div class="ec-notice">هذا القسم لا يرسل رسائل للعملاء. الربط الفعلي بالمتجر لم يُختبر بعد، وأي مفاتيح أو موافقات متجر تُهيأ بشكل آمن قبل استقبال البيانات.</div>
+  <div id="ecError" class="ec-error" hidden></div>
+  <div id="ecCounts" class="ec-stats"></div>
+  <section class="card"><div class="ec-heading"><h3>المتاجر</h3><button class="btn secondary ec-small" id="ecReload">تحديث</button></div><div id="ecStores" class="ec-store-grid"></div></section>
+  <section class="card"><h3>إضافة بيانات متجر</h3><form id="ecCreate" class="ec-form-grid"><div><label>المنصة</label><select id="ecProvider"><option value="salla">سلة</option><option value="zid">زد</option><option value="shopify">Shopify</option></select></div><div><label>اسم المتجر</label><input id="ecLabel" required maxlength="80" placeholder="متجر العناية" /></div><div><label>معرّف المتجر أو نطاق Shopify</label><input id="ecStoreRef" required dir="ltr" maxlength="150" placeholder="123456 أو store.myshopify.com" /></div><button class="btn" type="submit">إضافة دون اتصال</button></form><p class="hint">الإضافة تحفظ بيانات المتجر فقط، ولا تثبّت تطبيقًا ولا تسجّل اشتراكًا ولا تمنح صلاحية دخول.</p></section>
+  <section class="card"><div class="ec-heading"><h3>السلات والطلبات</h3><div class="ec-filters"><select id="ecStoreFilter"><option value="all">كل المتاجر</option></select><select id="ecTypeFilter"><option value="all">السلات والطلبات</option><option value="cart">السلات فقط</option><option value="order">الطلبات فقط</option></select></div></div><div class="ec-table-wrap"><table><thead><tr><th>العميل والمتجر</th><th>السجل</th><th>الحالة</th><th>القيمة</th><th>موافقة واتساب</th><th>الإجراءات</th></tr></thead><tbody id="ecRows"></tbody></table></div></section>
+  <section class="card ec-preview" id="ecPreview" hidden><div class="ec-heading"><h3>معاينة رسالة المتابعة</h3><button class="btn secondary ec-small" id="ecPreviewClose">إغلاق</button></div><p id="ecPreviewText" class="ec-message"></p><h4>حالة الإرسال</h4><ul id="ecPreviewBlocks" class="ec-blocks"></ul><p class="hint">لا يوجد زر إرسال أو اتصال بخدمة إرسال في هذا القسم.</p></section>
+  <section class="card" id="ecConsentPanel" hidden><h3>توثيق موافقة العميل</h3><input id="ecConsentId" type="hidden"/><label class="ec-check"><input id="ecConsentYes" type="checkbox"/> توجد موافقة واضحة لاستقبال رسائل واتساب</label><label>مصدر الموافقة وتاريخها</label><textarea id="ecConsentNote" rows="2" maxlength="500" placeholder="مثل: موافقة واضحة في صفحة الطلب بتاريخ..."></textarea><label class="ec-check"><input id="ecConsentOut" type="checkbox"/> ألغى العميل الاشتراك، تُمنع المتابعة</label><button class="btn" id="ecConsentSave">حفظ التوثيق</button><button class="btn secondary" id="ecConsentCancel">إلغاء</button><p class="hint">الشراء أو وجود رقم العميل وحده لا يعني الموافقة. الحفظ هنا لا يرسل رسالة.</p></section>
+  <section class="card"><h3>نصوص المتابعة</h3><p class="hint">عدّل النص ثم افتح «معاينة» على السجل المناسب. هذه النصوص لا تُعتمد كقوالب ميتا تلقائيًا.</p><div class="ec-form-grid"><div><label>المتجر</label><select id="ecWorkflowStore"></select></div><div><label>نوع المتابعة</label><select id="ecWorkflowType"><option value="cart">استعادة سلة متروكة</option><option value="paid">تأكيد الدفع</option><option value="fulfilled">تجهيز الطلب</option></select></div></div><label>النص</label><textarea id="ecWorkflowBody" rows="3" maxlength="2000"></textarea><p class="hint" dir="ltr">{{name}} · {{url}} · {{reference}}</p><button class="btn" id="ecWorkflowSave">حفظ للمعاينة فقط</button><span id="ecSaved" class="hint" role="status"></span></section>
+  <section class="card"><h3>سجل الاستقبال الموثّق</h3><div class="ec-table-wrap"><table><thead><tr><th>المتجر</th><th>الحدث</th><th>التحقق</th><th>الوقت</th></tr></thead><tbody id="ecEvents"></tbody></table></div></section>
+  <section class="card ec-demo"><h3>جرّب العرض دون ربط متجر</h3><p class="hint">أمثلة واضحة لعميل تجريبي وسلة وطلب. لا أرقام حقيقية ولا رسائل. تُحفظ الأمثلة منفصلة عن المتاجر التي تضيفها.</p><div class="ec-demo-buttons"><button class="btn secondary" data-ec-demo="salla">مثال سلة</button><button class="btn secondary" data-ec-demo="zid">مثال زد</button><button class="btn secondary" data-ec-demo="shopify">مثال Shopify</button></div></section>
+  <section class="card"><h3>حدود الربط قبل التشغيل</h3><ul class="ec-blocks"><li>سلة: يلزم تطبيق وصلاحيات المتجر وتوقيع صحيح. التحقق من نموذج متجر حقيقي ما زال مطلوبًا.</li><li>زد: يلزم توثيق Basic Auth خاص بالمتجر. يُحفظ الحدث الموثّق في السجل، وتحويل بياناته لسلة أو طلب ينتظر التحقق من النموذج.</li><li>Shopify: إنشاء سلة ليس تركًا مؤكدًا. الهاتف ورابط الاستعادة قد لا يتوفران دون صلاحيات بيانات العملاء المطلوبة.</li><li>لا ربط متجر أو نشر تطبيق أو شراء خدمة من هذه الصفحة. لا إرسال تلقائي، حتى مع توثيق الموافقة.</li></ul></section>
+</div></div>
+
+<script src="/ecommerce-ui.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -1183,10 +1206,11 @@ async function initMe(agent) {
   me = agent;
   $('notifBtn').hidden = false;
   renderNotifBtn();
-  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? t9n(' (مدير)') : '');
+  $('meBadge').textContent = agent.name + (agent.role === 'admin' ? t9n(' (مدير)') : '');
   $('logoutBtn').hidden = false;
   $('agentsNav').hidden = agent.role !== 'admin';
   $('apiNav').hidden = agent.role !== 'admin';
+  $('ecommerceNav').hidden = agent.role !== 'admin';
   if (agent.role === 'admin') loadAgents();
 }
 
@@ -1275,6 +1299,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
   b.classList.add('active');
   $('view-' + b.dataset.view).classList.add('active');
+  if (b.dataset.view === 'ecommerce') window.loadEcommerce();
   if (b.dataset.view === 'guide') loadGuide();
   if (b.dataset.view === 'dashboard') { loadDashboard(); loadGuide(); }
   if (b.dataset.view === 'profile') loadProfile();
@@ -1504,7 +1529,9 @@ function beep() {
 function renderNotifBtn() {
   const b = $('notifBtn');
   if (!b) return;
-  b.textContent = notifOn ? '🔔' : '🔕';
+  b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/></svg>';
+  b.setAttribute('aria-label', notifOn ? 'الإشعارات مفعّلة' : 'تفعيل الإشعارات');
+  b.style.opacity = notifOn ? '1' : '.65';
   b.title = notifOn ? t9n('إشعارات المتصفح مفعّلة') : t9n('تفعيل إشعارات الرسائل الجديدة');
 }
 $('notifBtn').onclick = async () => {
@@ -2457,4 +2484,4 @@ window.delRule = delRule;
 })();
 </script>
 </body>
-</html>
+ </html>
