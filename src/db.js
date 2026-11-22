@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
 
 try { db.exec(`ALTER TABLE phone_numbers ADD COLUMN welcome_message TEXT`); } catch {}
 try { db.exec(`ALTER TABLE phone_numbers ADD COLUMN after_hours_message TEXT`); } catch {}
+try { db.exec(`ALTER TABLE phone_numbers ADD COLUMN connected INTEGER NOT NULL DEFAULT 1`); } catch {}
 
 const ENV_PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID && !String(process.env.PHONE_NUMBER_ID).startsWith('SET_ME') ? String(process.env.PHONE_NUMBER_ID) : null;
 if (ENV_PHONE_NUMBER_ID) {
@@ -264,6 +265,18 @@ export function getPhoneNumberGreeting(phoneNumberId, kind) {
 export function setPhoneNumberGreetings(phoneNumberId, { welcome_message, after_hours_message }) {
   if (welcome_message !== undefined) db.prepare(`UPDATE phone_numbers SET welcome_message = ? WHERE phone_number_id = ?`).run(String(welcome_message ?? '').trim() || null, phoneNumberId);
   if (after_hours_message !== undefined) db.prepare(`UPDATE phone_numbers SET after_hours_message = ? WHERE phone_number_id = ?`).run(String(after_hours_message ?? '').trim() || null, phoneNumberId);
+}
+
+// قسم غير متصل بعد (بدون رقم واتساب فعلي) — يظهر في الواجهة للإعداد مسبقًا ولا يمكن الإرسال منه
+export function addPendingPhoneNumber(phoneNumberId, label, displayNumber = null) {
+  db.prepare(`INSERT INTO phone_numbers (phone_number_id, label, display_number, is_default, connected, created_at)
+    VALUES (?, ?, ?, 0, 0, ?)`).run(String(phoneNumberId), label, displayNumber ?? null, Date.now());
+}
+
+export function isConnectedPn(phoneNumberId) {
+  if (!phoneNumberId) return true;
+  const row = db.prepare(`SELECT connected FROM phone_numbers WHERE phone_number_id = ?`).get(String(phoneNumberId));
+  return row ? !!row.connected : true;
 }
 
 export function deletePhoneNumber(phoneNumberId) {
