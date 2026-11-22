@@ -1,3 +1,4 @@
+import {createDataTransfer} from './data-transfer.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -168,6 +169,8 @@ function requireAdmin(req, res, next) {
 function deptScope(req) {
   return req.agent?.role === 'admin' ? null : (req.agent?.phone_number_id || null);
 }
+
+createDataTransfer({app,requireAdmin,listPhoneNumbers});
 
 // منع الإرسال من قسم غير متصل
 function pnDisconnected(res, pn) {

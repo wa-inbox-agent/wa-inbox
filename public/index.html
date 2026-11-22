@@ -209,6 +209,8 @@
     body.chat-open #chatBackBtn { display: inline-block; }
     body.chat-open #composer textarea { font-size: 16px; }
   }
+
+#view-transfer.active{display:flex!important}#view-transfer label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}#view-transfer select,#view-transfer input{padding:10px;border:1px solid var(--border-2);border-radius:8px;background:#f8f9fc;font:inherit;max-width:100%;min-width:0}.dt-title{display:flex;justify-content:space-between;gap:20px;align-items:center}.dt-title h2{font-size:29px;margin:7px 0}.dt-title select{min-width:240px}.dt-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.dt-card{background:white;padding:23px;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}.dt-card h3{margin-bottom:12px}.dt-card .hint{line-height:1.9}.dt-banner{background:#eef4fc;border:1px solid #c9dbef;border-radius:12px;padding:16px 20px;font-size:14px;line-height:1.8;color:#294c75}.dt-actions{display:flex;gap:10px;flex-wrap:wrap;margin:17px 0 12px}.dt-mapping{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}.dt-metrics{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}.dt-metrics b{background:#edf1fa;border-radius:8px;padding:12px}.dt-table{overflow:auto;margin-top:14px}.dt-table table{width:100%;min-width:660px}.dt-table td{max-width:400px;white-space:pre-wrap;word-break:break-word;vertical-align:top}.dt-error{color:#b42318;font-size:13px;margin:6px}button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:760px){#view-transfer{padding:16px!important}.dt-grid{grid-template-columns:1fr}.dt-title{align-items:stretch;flex-direction:column}.dt-title select{min-width:0;width:100%}.dt-mapping{grid-template-columns:1fr 1fr}.dt-card{padding:17px}}
 </style>
 </head>
 <body>
@@ -232,23 +234,24 @@
     <div class="brand-sub">منصة واتساب للأعمال</div>
   </div>
   <nav>
-    <button data-view="dashboard" class="active"><span class="ico">📊</span>لوحة التحكم</button>
+    <button data-view="dashboard" class="active"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>لوحة التحكم</button>
     <div class="nav-group">إدارة واتساب</div>
-    <button data-view="profile"><span class="ico">🏢</span>الملف التجاري</button>
-    <button data-view="templates"><span class="ico">📋</span>قوالب الرسائل</button>
-    <button data-view="quick"><span class="ico">⚡</span>إرسال سريع</button>
-    <button data-view="campaigns"><span class="ico">📣</span>الحملات</button>
-    <button data-view="blocked"><span class="ico">🚫</span>المحظورون</button>
-    <button data-view="usage"><span class="ico">📈</span>ملخص الاستهلاك</button>
+    <button data-view="profile"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5h16v16M8 21v-5h8v5M8 9h1m6 0h1M8 12h1m6 0h1M2 21h20"/></svg></span>الملف التجاري</button>
+    <button data-view="templates"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/></svg></span>قوالب الرسائل</button>
+    <button data-view="quick"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m13 2-8 12h6l-1 8 9-13h-7l1-7Z"/></svg></span>إرسال سريع</button>
+    <button data-view="campaigns"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 15-6v16L3 14v-4ZM18 9h3v6h-3M7 16l2 6h3l-1-5"/></svg></span>الحملات</button>
+    <button data-view="blocked"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg></span>المحظورون</button>
+    <button data-view="usage"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M6 15l5-5 4 3 6-8"/></svg></span>ملخص الاستهلاك</button>
     <div class="nav-group">التواصل</div>
-    <button data-view="inbox"><span class="ico">💬</span>المحادثات المباشرة<span class="nav-badge" id="inboxNavBadge" hidden></span></button>
-    <button data-view="bot"><span class="ico">🤖</span>إدارة البوت</button>
-    <button data-view="contacts"><span class="ico">👥</span>جهات الاتصال</button>
-    <button data-view="agents" id="agentsNav" hidden><span class="ico">🧑‍💼</span>الموظفون</button>
+    <button data-view="inbox"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z"/><path d="M8 8h8M8 12h6"/></svg></span>المحادثات المباشرة<span class="nav-badge" id="inboxNavBadge" hidden></span></button>
+    <button data-view="bot"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M12 6V2M1 11v5m22-5v5M8 16h8"/><circle cx="8" cy="11" r="1"/><circle cx="16" cy="11" r="1"/></svg></span>إدارة البوت</button>
+    <button data-view="contacts"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 3a4 4 0 0 1 0 8m2 3a6 6 0 0 1 3 5v2"/></svg></span>جهات الاتصال</button>
+    <button data-view="transfer" id="transferNav" hidden><span class="ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></span>استيراد وتصدير</button>
+    <button data-view="agents" id="agentsNav" hidden><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3M8 20v-4m8 4v-4"/></svg></span>الموظفون</button>
     <div class="nav-group">النظام</div>
-    <button data-view="reports" id="reportsNav"><span class="ico">🛰️</span>سجل الاتصال</button>
-    <button data-view="api" id="apiNav" hidden><span class="ico">🔌</span>المطورون (API)</button>
-    <button data-view="help"><span class="ico">❓</span>المساعدة</button>
+    <button data-view="reports" id="reportsNav"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>سجل الاتصال</button>
+    <button data-view="api" id="apiNav" hidden><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5-6 7 6 7m8-14 6 7-6 7M14 3l-4 18"/></svg></span>المطورون (API)</button>
+    <button data-view="help"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 4 3c-1 .5-1 1-1 2M12 17h.01"/></svg></span>المساعدة</button>
   </nav>
   <div class="side-foot">
     <button id="langBtn" type="button">English</button>
@@ -800,6 +803,19 @@
   </div>
 </div>
 
+<section class="view" id="view-transfer" style="overflow:auto;display:none;padding:28px;flex-direction:column;gap:18px">
+ <div class="dt-title"><div><p style="color:var(--gold-2);font-weight:700">البيانات والسجل التاريخي</p><h2>استيراد وتصدير</h2><p class="hint">نقل منظم، دون المساس بالمحادثات المباشرة</p></div><div><label>القسم المستهدف<select id="dtDept"><option value="">اختر القسم صراحةً</option></select></label></div></div>
+ <div class="dt-banner">السجلات المستوردة تحفظ في أرشيف مستقل. لا تشغيل للبوت، لا رسائل، ولا فتح لنافذة الرد. الموافقات تحفظ كدليل غير متحقق منه، ولا تفعل الإرسال. لا يتم تعديل بيانات المنصة الحالية.</div>
+ <div id="dtNotice" role="status" aria-live="polite"></div>
+ <div class="dt-grid"><article class="dt-card"><h3>تصدير بيانات القسم</h3><p class="hint">رسائل القسم الحالية، وجهات الاتصال المرتبطة بمحادثاته، وأرشيف الاستيراد. لا تشمل كلمات السر أو مفاتيح الربط. JSON هو النسخة الكاملة؛ CSV عرض جدولي آمن لبرنامج Excel.</p><div class="dt-actions"><button id="dtExportjson" class="btn">تنزيل JSON</button><button id="dtExportcsv" class="btn secondary">تنزيل CSV</button></div><p class="hint">روابط وعرّفات الملفات ليست نسخة من الملفات نفسها. لا يتم تنزيل المرفقات من مزود خارجي.</p></article>
+ <article class="dt-card"><h3>أرشيف مستقل لكل قسم</h3><strong id="dtTotal" style="font-size:36px;color:var(--navy)">0</strong><p class="hint">سجل تاريخي محفوظ. لا تفعيل تلقائي لجهات الاتصال في الحملات. إعدادات البوت والموظفين والقوالب لا تتغير.</p></article></div>
+ <article id="dtImport" class="dt-card" hidden><h3>استيراد بمعاينة قبل الحفظ</h3><p class="hint">ندعم CSV وJSON بالقالب أدناه، حتى 5000 صف و1.5 MB للدفعة. ملفات Excel من تقنيات: احفظ نسخة CSV UTF-8 ثم اربط الأعمدة. توافق أعمدة تقنيات الفعلية واكتمال التصدير لم يتم التحقق منهما بعد.</p>
+ <div class="dt-grid"><label>اسم المصدر<input id="dtProvider" value="taqnyat" maxlength="60" dir="ltr" /></label><label>ملف البيانات<input type="file" id="dtFile" accept=".csv,.json" /></label></div><button class="btn secondary" id="dtExample">تنزيل مثال وهمي JSON</button>
+ <details style="margin-top:14px"><summary>قواعد ربط الأعمدة</summary><p class="hint">كل صف رسالة يحتاج رقمًا دوليًا، اتجاه inbound أو outbound، وقت ISO مع المنطقة الزمنية، ونصًا أو رابط ملف. kind يميز message عن contact. معرّف المصدر مهم لكشف التكرار والتعارض. جهات الاتصال لا تتطلب اتجاهًا أو وقت رسالة. ربط «غير موجود» لا يخمن القيمة.</p></details>
+ <div id="dtMapping" class="dt-mapping"></div><div class="dt-actions"><button class="btn" id="dtPreview">فحص ومعاينة الملف</button><button class="btn secondary" id="dtCommit" disabled>حفظ كسجل تاريخي فقط</button></div><div id="dtSummary"></div></article>
+ <article class="dt-card"><h3>آخر السجلات التاريخية <small class="hint">حتى 100 سجل</small></h3><div class="dt-table"><table><thead><tr><th>الرقم</th><th>الاسم / النوع</th><th>المحتوى</th><th>الوقت الأصلي</th><th>الاشتراك / المصدر</th></tr></thead><tbody id="dtArchive"><tr><td colspan="5">اختر قسمًا لمراجعة أرشيفه.</td></tr></tbody></table></div></article>
+ <article class="dt-card"><h3>سجل الدفعات</h3><div class="dt-table"><table><thead><tr><th>المصدر</th><th>تاريخ المعاينة</th><th>الصفوف</th><th>الحالة</th></tr></thead><tbody id="dtBatches"></tbody></table></div></article>
+</section>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -884,10 +900,11 @@ async function initMe(agent) {
   me = agent;
   $('notifBtn').hidden = false;
   renderNotifBtn();
-  $('meBadge').textContent = '👤 ' + agent.name + (agent.role === 'admin' ? t9n(' (مدير)') : '');
+  $('meBadge').textContent = agent.name + (agent.role === 'admin' ? t9n(' (مدير)') : '');
   $('logoutBtn').hidden = false;
   $('agentsNav').hidden = agent.role !== 'admin';
   $('apiNav').hidden = agent.role !== 'admin';
+  $('transferNav').hidden = agent.role !== 'admin';
   if (agent.role === 'admin') loadAgents();
 }
 
@@ -984,6 +1001,7 @@ document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => {
   if (b.dataset.view === 'templates') loadTemplates();
   if (b.dataset.view === 'campaigns') { loadCampaigns(); loadApprovedTemplates(); }
   if (b.dataset.view === 'contacts') loadContacts();
+  if (b.dataset.view === 'transfer') window.loadDataTransfer();
   if (b.dataset.view === 'agents') loadAgents();
   if (b.dataset.view === 'reports') loadReports();
   if (b.dataset.view === 'api') loadKeys();
@@ -1204,7 +1222,7 @@ function beep() {
 function renderNotifBtn() {
   const b = $('notifBtn');
   if (!b) return;
-  b.textContent = notifOn ? '🔔' : '🔕';
+  b.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>'+(notifOn?'':'<path d="m3 3 18 18"/>')+'</svg>';
   b.title = notifOn ? t9n('إشعارات المتصفح مفعّلة') : t9n('تفعيل إشعارات الرسائل الجديدة');
 }
 $('notifBtn').onclick = async () => {
@@ -2186,5 +2204,6 @@ window.delRule = delRule;
   setInterval(() => { if (me) { loadConvos().catch(() => {}); loadMessages().catch(() => {}); loadPhoneNumbers().catch(() => {}); } }, 5000);
 })();
 </script>
+<script src="/data-transfer-ui.js"></script>
 </body>
-</html>
+ </html>
