@@ -1,3 +1,4 @@
+import {ACADEMY_PN,VERSION as ACADEMY_VERSION,HOME as ACADEMY_HOME,academyStep} from '../public/academy-flow.js';
 import {metaWebhookGuard,webhookSecurityStatus} from './webhook-security.js';
 import {createDepartmentPrivacy} from './department-privacy.js';
 import {createDataTransfer} from './data-transfer.js';
@@ -290,6 +291,49 @@ if (agentsCount() === 0 && process.env.ADMIN_USER && process.env.ADMIN_PASSWORD)
   console.log(`تم إنشاء حساب المدير: ${process.env.ADMIN_USER}`);
 }
 
+// Academy content migration is scoped to its verified number. Keep live automation OFF.
+const academyCatalog=JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)),'../public/academy-catalog.json'),'utf8'));
+db.exec(`CREATE TABLE IF NOT EXISTS academy_flow_state (wa_id TEXT NOT NULL, phone_number_id TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY(wa_id,phone_number_id));
+CREATE TABLE IF NOT EXISTS academy_bot_content_archive (version TEXT PRIMARY KEY, snapshot TEXT NOT NULL, created_at INTEGER NOT NULL);`);
+if(listPhoneNumbers().some(p=>p.phone_number_id===ACADEMY_PN)&&getSetting('academy_flow_version')!==ACADEMY_VERSION){
+ db.exec('BEGIN IMMEDIATE');try{
+  const legacyDefault=defaultPhoneNumberId()===ACADEMY_PN;
+  const oldRules=db.prepare('SELECT * FROM bot_rules WHERE phone_number_id=? OR (phone_number_id IS NULL AND ?=1)').all(ACADEMY_PN,legacyDefault?1:0);
+  const oldSettings=db.prepare('SELECT key,value FROM settings WHERE key LIKE ?').all('department:'+ACADEMY_PN+':%');
+  db.prepare('INSERT OR IGNORE INTO academy_bot_content_archive VALUES(?,?,?)').run(ACADEMY_VERSION,JSON.stringify({rules:oldRules,settings:oldSettings,global:getBotSettings(),legacySettings:legacyDefault?allSettings():null}),Date.now());
+  db.prepare('DELETE FROM bot_rules WHERE phone_number_id=? OR (phone_number_id IS NULL AND ?=1)').run(ACADEMY_PN,legacyDefault?1:0);
+  setSetting('department:'+ACADEMY_PN+':bot_enabled','0');
+  for(const [key,value] of Object.entries({welcome_enabled:'0',welcome_message:ACADEMY_HOME,after_hours_enabled:'0',after_hours_message:'أهلًا بك في أكاديمية غرفة جازان. ساعات العمل المنشورة: الأحد إلى الخميس، 08:00 إلى 14:30 بتوقيت السعودية. خدمة العملاء: 0500205353.',work_start:'08:00',work_end:'14:30',work_days:'0,1,2,3,4'}))setSetting('department:'+ACADEMY_PN+':'+key,value);
+  if(legacyDefault){setSetting('welcome_message',ACADEMY_HOME);setSetting('after_hours_message','ساعات عمل الأكاديمية: الأحد إلى الخميس، 08:00 إلى 14:30. خدمة العملاء: 0500205353.');setSetting('work_start','08:00');setSetting('work_end','14:30');}
+  setPhoneNumberGreetings(ACADEMY_PN,{welcome_message:ACADEMY_HOME,after_hours_message:'ساعات العمل المنشورة للأكاديمية: الأحد إلى الخميس، 08:00 إلى 14:30 بتوقيت السعودية. خدمة العملاء: 0500205353.'});
+  db.prepare('UPDATE conversations SET pending_menu=NULL WHERE phone_number_id=?').run(ACADEMY_PN);
+  setSetting('academy_flow_version',ACADEMY_VERSION);db.exec('COMMIT');
+ }catch(e){db.exec('ROLLBACK');throw e;}
+}
+app.get('/api/academy-bot', (req,res)=>{
+ if(deptScope(req)&&deptScope(req)!==ACADEMY_PN)return res.sendStatus(403);
+ res.json({version:ACADEMY_VERSION,phone_number_id:ACADEMY_PN,enabled:departmentBotEnabled(ACADEMY_PN),security_ready:webhookSecurityStatus().ingress_ready&&process.env.ACADEMY_APP_BINDING_VERIFIED==='1',catalog:academyCatalog.filter(c=>c.open)});
+});
+async function academyReply(msg,pn){
+ if(!webhookSecurityStatus().ingress_ready||process.env.ACADEMY_APP_BINDING_VERIFIED!=='1')return;
+ let state={};try{state=JSON.parse(db.prepare('SELECT state FROM academy_flow_state WHERE wa_id=? AND phone_number_id=?').get(msg.from,pn)?.state||'{}');}catch{}
+ const id=msg.interactive?.button_reply?.id??msg.interactive?.list_reply?.id;
+ if(/^csat_[1-5]$/.test(id||''))state={node:'rating'};
+ const input=/^csat_[1-5]$/.test(id||'')?id.slice(-1):id?.startsWith('academy:')?id.slice(8):(msg.text?.body??'');
+ const out=academyStep(state,input,academyCatalog);
+ db.prepare('INSERT INTO academy_flow_state VALUES(?,?,?) ON CONFLICT(wa_id,phone_number_id) DO UPDATE SET state=excluded.state').run(msg.from,pn,JSON.stringify(out.state));
+ if(out.handoff){setConversationBot(msg.from,false,pn);setPendingMenu(msg.from,null,pn);}
+ if(out.rating)addCsatRating(msg.from,pn,out.rating);
+ if(out.options.length){
+  const menu={id:'academy',response:out.text,options:out.options.map((o,i)=>({key:o.id,label:o.label,reply:''}))};
+  // Use dedicated stable Academy interactive IDs, rather than legacy rule IDs.
+  try{
+   const interactive={type:'list',body:{text:out.text},action:{button:'اختيار الخدمة',sections:[{title:'أكاديمية غرفة جازان',rows:out.options.map(o=>({id:'academy:'+o.id,title:o.label.slice(0,24)}))}]}};
+   const result=await sendInteractive(msg.from,interactive,pn);insertOutbound({waId:msg.from,phoneNumberId:pn,waMessageId:result?.messages?.[0]?.id,body:out.text+'\n'+out.options.map((o,i)=>(i+1)+'. '+o.label).join('\n'),bot:1,type:'interactive'});
+  }catch{await sendBotText(msg.from,out.text+'\n'+out.options.map((o,i)=>(i+1)+'. '+o.label).join('\n'),pn);}
+ }else await sendBotText(msg.from,out.text,pn);
+}
+
 // هل نحن الآن خارج ساعات العمل؟ (بتوقيت الرياض)
 function isAfterHours(phoneNumberId = null) {
   if (departmentSetting(phoneNumberId, 'after_hours_enabled') !== '1') return false;
@@ -345,6 +389,10 @@ async function sendBotMenu(waId, rule, phoneNumberId = null) {
 // رد البوت التلقائي على رسالة واردة (إن كان مفعّلًا)
 async function maybeBotReply(msg, phoneNumberId = null) {
   if (msg.type !== 'text' && msg.type !== 'interactive') return;
+  if(phoneNumberId===ACADEMY_PN){
+    if(!departmentBotEnabled(phoneNumberId)||!getConversationBot(msg.from,phoneNumberId))return;
+    await academyReply(msg,phoneNumberId);return;
+  }
   // رد على تقييم العميل (CSAT) قبل أي منطق بوت
   const csatSelId = msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null;
   const csatMatch = /^csat_([1-5])$/.exec(String(csatSelId ?? ''));
@@ -662,6 +710,7 @@ app.post('/api/conversations/:waId/labels', (req, res) => {
 // تفعيل/إيقاف البوت لمحادثة واحدة
 app.post('/api/conversations/:waId/bot', (req, res) => {
   setConversationBot(req.params.waId, Boolean(req.body?.enabled), req.body?.pn ?? null);
+  if(req.body?.enabled&&(req.body?.pn??defaultPhoneNumberId())===ACADEMY_PN)db.prepare('DELETE FROM academy_flow_state WHERE wa_id=? AND phone_number_id=?').run(req.params.waId,ACADEMY_PN);
   res.json({ ok: true });
 });
 
@@ -1000,6 +1049,14 @@ app.post('/api/quick-send', wrap(async (req, res) => {
   const pn = phone_number_id || null;
   const header = header_link ? { link: header_link, type: header_type ?? 'image' } : null;
   const bodyParams = Array.isArray(req.body?.body_params) ? req.body.body_params.map((v) => String(v)) : [];
+  const templates=await listTemplates();
+  const selected=templates.find(t=>t.name===template_name&&t.language===(language_code||'ar')&&t.status==='APPROVED');
+  if(!selected)return res.status(400).json({error:'اختر قالبًا معتمدًا ومتاحًا بنفس اللغة'});
+  const components=selected.components||[];
+  const bodyText=components.find(c=>c.type==='BODY')?.text||'';
+  const keys=[...new Set([...bodyText.matchAll(/\{\{(\d+)\}\}/g)].map(m=>+m[1]))].sort((a,b)=>a-b);
+  if(components.some(c=>c.type==='HEADER'&&/\{\{/.test(c.text||''))||/\{\{[^\d}]/.test(bodyText))return res.status(400).json({error:'هذا النوع من المتغيرات غير مدعوم في الإرسال السريع'});
+  if(keys.some((n,i)=>n!==i+1)||bodyParams.length!==keys.length||bodyParams.some(v=>!v.trim()||v.length>1024))return res.status(400).json({error:'أكمل قيم جميع المتغيرات بالترتيب الصحيح دون قيم فارغة'});
   (async () => {
     for (const n of numbers) {
       try {

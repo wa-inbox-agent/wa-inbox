@@ -31,3 +31,44 @@
  for(const [id,[path,aa,en]]of Object.entries(icons)){const el=document.getElementById(id);if(!el)continue;el.setAttribute('aria-label',ar()?aa:en);el.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="'+path+'"/></svg>';}
 
 })();
+
+/* Academy typography helper: display only; no API, value, or configuration writes. */
+(() => {
+ let pending=false;const counters=new WeakMap();
+ const eligible='textarea:not([data-typography-skip])';
+ function grow(e){
+  if(e.offsetParent===null)return;
+  const focused=document.activeElement===e;
+  if(focused)return; // Never move the caret or resize beneath an active editor.
+  e.style.height='auto';
+  const cap=matchMedia('(max-width:860px)').matches?420:560;
+  e.style.height=Math.min(cap,Math.max(155,e.scrollHeight+3))+'px';
+ }
+ function apply(){
+  pending=false;
+  document.querySelectorAll(eligible).forEach(e=>{
+   if(!e.classList.contains('ux-copy-editor'))e.classList.add('ux-copy-editor');
+   if(!e.hasAttribute('dir')&&!e.id.toLowerCase().includes('json'))e.dir='auto';
+   if(e.dataset.typographyBound){counters.get(e)?.();return;}
+   e.dataset.typographyBound='true';
+   const inBot=!!e.closest('#view-bot');
+   let count;
+   if(inBot){
+    const caption=document.createElement('div');caption.className='ux-copy-caption';caption.dataset.for=e.id;
+    const hint=document.createElement('span');hint.textContent=document.documentElement.lang==='en'?'Line breaks are preserved in the reply.':'يُحفظ الرد بنفس ترتيب الأسطر.';
+    count=document.createElement('span');caption.append(hint,count);e.after(caption);
+   }
+   const update=()=>{if(!count)return;const text=e.value.length.toLocaleString(document.documentElement.lang==='en'?'en':'ar-SA')+(document.documentElement.lang==='en'?' characters':' حرف');if(count.textContent!==text)count.textContent=text;};
+   counters.set(e,update);e.addEventListener('input',update);e.addEventListener('blur',()=>{grow(e);update();});
+   e.addEventListener('focus',update);update();grow(e);
+  });
+  document.querySelectorAll('textarea.ux-copy-editor').forEach(grow);
+ }
+ const schedule=()=>{if(!pending){pending=true;requestAnimationFrame(apply);}};
+ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});
+ document.addEventListener('click',e=>{if(e.target.closest('[data-view]'))requestAnimationFrame(()=>requestAnimationFrame(apply));});
+ window.addEventListener('resize',schedule);
+ // Existing loaders assign textarea.value without a DOM mutation. These bounded
+ // passes catch initial asynchronous loads without polling or touching state.
+ requestAnimationFrame(apply);setTimeout(apply,450);setTimeout(apply,1400);
+})();

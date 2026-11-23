@@ -693,7 +693,7 @@
 <!-- البوت -->
 <div class="view" id="view-bot">
   <div class="page">
-    <h2>الرد الآلي (البوت)</h2>
+    <h2>الرد الآلي (البوت)</h2><p><a href="/academy-preview.html" target="_blank" rel="noopener">معاينة بوت الأكاديمية الآمنة، بدون إرسال</a></p><p class="hint">بوت الأكاديمية الجديد مستقل عن جدول القواعد القديم. افتح المعاينة لتجربة القوائم والتقييم. التشغيل التلقائي المباشر متوقف حتى التحقق من أمان الربط.</p>
     <div class="err" id="botErr"></div>
     <div class="card switch-row">
       <input type="checkbox" id="botGlobal" />
@@ -1139,10 +1139,11 @@ async function loadQuick() {
     sel.innerHTML = approved.length ? '' : '<option value="">' + t9n('لا توجد قوالب معتمدة بعد') + '</option>';
     for (const t of approved) sel.innerHTML += `<option value="${esc(t.name)}" data-lang="${esc(t.language)}">${esc(t.name)} (${esc(t.language)})</option>`;
     const showPreview = () => {
-      const t = approved.find((x) => x.name === sel.value);
+      const t = approved.find((x) => x.name === sel.value && x.language === sel.selectedOptions[0]?.dataset.lang);
       const body = (t?.components ?? []).find((c) => c.type === 'BODY')?.text ?? '';
       $('quickTplPreview').style.display = body ? 'block' : 'none';
       $('quickTplPreview').textContent = body;
+      window.renderQuickVariables?.(t);
     };
     sel.onchange = showPreview;
     showPreview();
@@ -1159,8 +1160,10 @@ $('quickSend').onclick = async () => {
     return;
   }
   try {
+    const bodyParams=window.readQuickVariables?.() ?? [];
+    if (!confirm('سيتم إرسال القالب بالقيم الظاهرة إلى الأرقام المحددة. متابعة؟')) return;
     const r = await api('/api/quick-send', { body: {
-      template_name: tpl, language_code: lang, numbers: $('quickNumbers').value,
+      template_name: tpl, language_code: lang, numbers: $('quickNumbers').value, body_params: bodyParams,
       header_link: $('quickHeaderLink').value.trim() || null, header_type: $('quickHeaderType').value,
       phone_number_id: $('quickNumber').value || null,
     } });
@@ -2238,5 +2241,6 @@ window.delRule = delRule;
 </script>
 <script src="/data-transfer-ui.js"></script>
 <script src="/ux-shell.js" defer></script>
+<script src="/quick-variables.js"></script>
 </body>
        </html>

@@ -1,0 +1,314 @@
+[
+  {
+    "title": "دورة تعلم اللغة الصينية",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/125",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 125
+  },
+  {
+    "title": "صناعة الأفلام بمساعدة Claude و Google flow",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/124",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 124
+  },
+  {
+    "title": "إدارة المستشفيات",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/123",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 123
+  },
+  {
+    "title": "الترميز الطبي",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/122",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 122
+  },
+  {
+    "title": "مكافحة العدوى",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/121",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 121
+  },
+  {
+    "title": "ورشة عمل (عقلية التسويق)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/119",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 119
+  },
+  {
+    "title": "ورشة عمل (انطلاقة طموح)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/118",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 118
+  },
+  {
+    "title": "دبلوم السكرتارية وإدارة المكاتب العليا دفعة 2",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/117",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 117
+  },
+  {
+    "title": "دبلوم إدارة اللوجستيات وسلاسل التوريد دفعة 2",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/116",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 116
+  },
+  {
+    "title": "دورة تنسيق الزهور",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/115",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 115
+  },
+  {
+    "title": "دورة الانعاش القلبي الرئوي",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/114",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 114
+  },
+  {
+    "title": "دورة الإسعافات الأولية",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/113",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 113
+  },
+  {
+    "title": "ورشة عمل (مهارات القائد الناجح )",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/111",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 111
+  },
+  {
+    "title": "دبلوم الموشن جرافيك 2026",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/110",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 110
+  },
+  {
+    "title": "ورشة عمل (مفهوم تحليل البيانات )",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/109",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 109
+  },
+  {
+    "title": "دورة التأهيلية الرئيس التنفيذي",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/107",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 107
+  },
+  {
+    "title": "دورة تأهيلية ادخال البيانات ومعالجة النصوص دفعة الثانية (2026)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/106",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 106
+  },
+  {
+    "title": "دورة تأهيلية  في الإدارة الاستراتيجية دفعة الرابعة (2026)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/105",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 105
+  },
+  {
+    "title": "دبلوم الموارد البشرية دفعة الثالثة (2026)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/104",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 104
+  },
+  {
+    "title": "مقاومة التغيير",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/103",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 103
+  },
+  {
+    "title": "معسكر التصوير 2",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/102",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 102
+  },
+  {
+    "title": "دورة فن اعداد الكيك",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/101",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 101
+  },
+  {
+    "title": "دورة تأهيلية  في الإدارة الاستراتيجية (دفعة 3)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/99",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 99
+  },
+  {
+    "title": "دبلوم مشارك في صناعة المحتوى2026",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/98",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 98
+  },
+  {
+    "title": "دبلوم مشارك في المحاسبة والضرائب 2026",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/97",
+    "open": true,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 97
+  },
+  {
+    "title": "السكرتارية الطبية",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/96",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 96
+  },
+  {
+    "title": "دورة ادخال البيانات ومعالجة النصوص  (سيسكو 2025)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/95",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 95
+  },
+  {
+    "title": "دبلوم تقنية الحاسب الالى (سيسكو 2025)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/94",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 94
+  },
+  {
+    "title": "دبلوم الامن السيبراني  (سيسكو 2025)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/93",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 93
+  },
+  {
+    "title": "معسكر التصوير بالشراكة مع شركة عبدالواحد التصوير .",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/92",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 92
+  },
+  {
+    "title": "ورشة عمل (فن البروتوكول والمراسم والاتكيت السعودي والعالمي)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/90",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 90
+  },
+  {
+    "title": "ورشة عمل (من الخطة إلى السوق )",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/89",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 89
+  },
+  {
+    "title": "ورشة عمل( بناء وادارة المبادرات )",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/88",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 88
+  },
+  {
+    "title": "دورة تأهيلية  في الإدارة الاستراتيجية (2)",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/87",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 87
+  },
+  {
+    "title": "دبلوم مشارك مهني في السكرتارية  وإدارة المكاتب العليا (2025 )",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/85",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": true,
+    "id": 85
+  },
+  {
+    "title": "إدارة اللوجستيات وسلاسل  التوريد",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/84",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 84
+  },
+  {
+    "title": "دورة تأهيلية (ادخال البيانات ومعالجة النصوص )",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/83",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 83
+  },
+  {
+    "title": "دورة تأهيلية  في الإدارة الاستراتيجية",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/49",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 49
+  },
+  {
+    "title": "إدارة الموارد البشرية",
+    "url": "https://academy.jazancci.org.sa/Website/CourseDetails/48",
+    "open": false,
+    "statusVerifiedOn": "2026-11-23",
+    "diploma": false,
+    "id": 48
+  }
+]
