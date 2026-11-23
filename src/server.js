@@ -219,6 +219,29 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// Owner-authorized self-service password change. No target-user selector is accepted.
+const passwordChangeAttempts = new Map();
+app.post('/api/auth/change-password', requireAdmin, (req, res) => {
+  const origin = req.get('origin');
+  try { if (!origin || new URL(origin).host !== req.get('host')) return res.status(403).json({error:'افتح النموذج من نفس موقع المنصة'}); }
+  catch { return res.status(403).json({error:'مصدر الطلب غير صالح'}); }
+  const id=req.agent.id, now=Date.now(), a=passwordChangeAttempts.get(id);
+  if(a && a.until>now && a.count>=5)return res.status(429).json({error:'حاول بعد عشر دقائق'});
+  const {current_password,new_password}=req.body??{};
+  if(typeof current_password!=='string'||typeof new_password!=='string'||new_password.length<12||new_password.length>128)return res.status(400).json({error:'كلمة السر الجديدة من 12 إلى 128 حرفًا'});
+  const account=getAgentByUsername(req.agent.username);
+  if(!verifyPassword(current_password,account.pass_hash)){
+    const entry=a&&a.until>now?a:{count:0,until:now+600000};entry.count++;passwordChangeAttempts.set(id,entry);
+    return res.status(403).json({error:'كلمة السر الحالية غير صحيحة'});
+  }
+  if(verifyPassword(new_password,account.pass_hash))return res.status(400).json({error:'اختر كلمة سر جديدة مختلفة'});
+  db.prepare('UPDATE agents SET pass_hash=? WHERE id=?').run(hashPassword(new_password),id);
+  passwordChangeAttempts.delete(id);
+  res.setHeader('Cache-Control','no-store');
+  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; Max-Age=0`);
+  res.json({ok:true});
+});
+
 app.get('/api/me', (req, res) => {
   res.json({ agent: req.agent });
 });
