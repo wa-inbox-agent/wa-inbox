@@ -49,7 +49,7 @@ const bAgent=s.getAgentByUsername('b').id;
 s.addCsatRating(onlyA,'1226967047176539',5);s.addCsatRating(onlyB,'dept-b',1);
 mkdirSync('data/media',{recursive:true});writeFileSync('data/media/'+aId,'PRIVATE_MEDIA_A');writeFileSync('data/media/'+bId,'PRIVATE_MEDIA_B');
 writeFileSync('data/media/'+aId+'.ct','text/plain');writeFileSync('data/media/'+bId+'.ct','text/plain');
-const port=randomInt(34000,49000),env={PATH:process.env.PATH,HOME:process.env.HOME,PORT:String(port),AUTH_SECRET:'isolated-test-signing-secret',PHONE_NUMBER_ID:'1226967047176539',WABA_ID:'fixture',WHATSAPP_TOKEN:'fixture-not-real',VERIFY_TOKEN:'fixture',META_APP_SECRET:'synthetic-webhook-only',WEBHOOK_SIGNATURE_ENFORCE:'1',NODE_ENV:'production'};
+const port=randomInt(34000,49000),env={PATH:process.env.PATH,HOME:process.env.HOME,PORT:String(port),AUTH_SECRET:'isolated-test-signing-secret',PHONE_NUMBER_ID:'1226967047176539',WABA_ID:'fixture',WHATSAPP_TOKEN:'fixture-not-real',VERIFY_TOKEN:'fixture',META_APP_SECRET:'synthetic-webhook-only',WEBHOOK_SIGNATURE_ENFORCE:'1',ACADEMY_APP_BINDING_VERIFIED:'1',NODE_ENV:'production'};
 const child=spawn(process.execPath,['src/server.js'],{cwd:root,env,stdio:['ignore','pipe','pipe']});let logs='';child.stdout.on('data',b=>logs+=b);child.stderr.on('data',b=>logs+=b);
 const base='http://127.0.0.1:'+port,cookies={};let assertions=0;const evidence=[];
 const check=(ok,label)=>{assert.ok(ok,label);assertions++;};
@@ -87,5 +87,10 @@ try{
  out=academyStep({},'rating',catalog);out=academyStep(out.state,'٥',catalog);check(out.rating===5,'Arabic numeric rating');
  out=academyStep({},'human',catalog);check(out.handoff&&out.state.node==='handoff','handoff flag');out=academyStep(out.state,'hello',catalog);check(out.options.length===0&&!out.rating,'handoff stays stopped');
  out=academyStep(out.state,'0',catalog);check(out.options.length===8,'preview restart navigation');
+ s.setSetting('department:'+pn+':bot_enabled','1');
+ const webhook=async(id,text,interactive)=>{const payload={object:'whatsapp_business_account',entry:[{id:'fixture',changes:[{value:{metadata:{phone_number_id:pn},messages:[{id,from:onlyA,type:interactive?'interactive':'text',...(interactive?{interactive:{list_reply:{id:'academy:'+text,title:text}}}:{text:{body:text}})}]}}]}]};const raw=JSON.stringify(payload);return req('none','/webhook',{method:'POST',raw,headers:{'Content-Type':'application/json','x-hub-signature-256':'sha256='+createHmac('sha256','synthetic-webhook-only').update(raw).digest('hex')}});};
+ await webhook('academy-main','hello');await sleep(40);check(calls().some(c=>c.name==='sendInteractive'&&c.args[2]===pn),'live engine selected correct Academy sender');
+ await webhook('academy-handoff','human',true);await sleep(40);check(!s.getConversationBot(onlyA,pn),'actual webhook handoff disables conversation bot');
+ const count=calls().length;await webhook('academy-after-handoff','hello');await sleep(40);check(calls().length===count,'no auto reply after actual handoff');
  console.log('PASS '+assertions+' Academy/quick-variable isolated assertions, '+evidence.length+' HTTP requests; provider replaced, no real sends.');
 } catch(e){console.error(logs);throw e;} finally {child.kill('SIGTERM');await new Promise(r=>child.once('exit',r));db.close();}

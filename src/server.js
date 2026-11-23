@@ -312,7 +312,7 @@ if(listPhoneNumbers().some(p=>p.phone_number_id===ACADEMY_PN)&&getSetting('acade
 }
 app.get('/api/academy-bot', (req,res)=>{
  if(deptScope(req)&&deptScope(req)!==ACADEMY_PN)return res.sendStatus(403);
- res.json({version:ACADEMY_VERSION,phone_number_id:ACADEMY_PN,enabled:departmentBotEnabled(ACADEMY_PN),security_ready:webhookSecurityStatus().ingress_ready&&process.env.ACADEMY_APP_BINDING_VERIFIED==='1',catalog:academyCatalog.filter(c=>c.open)});
+ res.json({version:ACADEMY_VERSION,phone_number_id:ACADEMY_PN,can_manage:req.agent?.role==='admin',enabled:departmentBotEnabled(ACADEMY_PN),security_ready:webhookSecurityStatus().ingress_ready&&process.env.ACADEMY_APP_BINDING_VERIFIED==='1',catalog:academyCatalog.filter(c=>c.open)});
 });
 async function academyReply(msg,pn){
  if(!webhookSecurityStatus().ingress_ready||process.env.ACADEMY_APP_BINDING_VERIFIED!=='1')return;
